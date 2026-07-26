@@ -158,9 +158,15 @@ function fewShotExamples() {
     `原因：收尾前再确认一次核心观点。`;
 }
 
-function interviewerSystem(goal) {
+function interviewerSystem(session) {
+  const { goal, targetAudience, scenarios, persona, methodology } = session;
+  let context = `研究目标："${goal}"\n`;
+  if (targetAudience) context += `目标受众：${targetAudience}\n`;
+  if (scenarios) context += `研究场景：${scenarios}\n`;
+  if (persona) context += `受访者画像/上下文：${persona}\n`;
+  if (methodology && methodology !== 'general') context += `采用方法学：${methodology}\n`;
   return `你是一位经验丰富的定性研究访谈主持人。\n` +
-    `研究目标："${goal}"\n\n` +
+    `${context}\n` +
     `访谈阶段定义：\n${stageDefinitions()}\n\n` +
     `规则：\n` +
     `- 一次只问一个简洁的问题。\n` +
@@ -169,13 +175,14 @@ function interviewerSystem(goal) {
     `- 不要给出分析、总结、bullet list。\n` +
     `- 当接近收尾阶段时，主动结束访谈并感谢受访者。\n` +
     `- 必须根据当前阶段选择合适的提问策略。\n` +
+    `- 必须结合目标受众、场景和画像调整措辞，让受访者感到问题与自己相关。\n` +
     `- 输出必须是 JSON，格式如下：\n` +
-    `{\n  "question": "下一个问题",\n  "stage": "当前阶段英文名（opening/background/core_exploration/deep_probing/closing）",\n  "reason": "为什么选择这个问题，它如何服务于当前阶段或研究目标",\n  "probe_target": "如果这个问题是追问，追问的目标是什么（可选）"\n}` +
+    `{\n  "question": "下一个问题",\n  "stage": "当前阶段英文名（opening/background/core_exploration/deep_probing/closing）",\n  "reason": "为什么选择这个问题，它如何服务于当前阶段、目标受众或研究目标",\n  "probe_target": "如果这个问题是追问，追问的目标是什么（可选）"\n}` +
     fewShotExamples();
 }
 
 async function askQuestion({ session, apiKey, userText = null, stage = null }) {
-  const messages = [{ role: 'system', content: interviewerSystem(session.goal) }];
+  const messages = [{ role: 'system', content: interviewerSystem(session) }];
   for (const m of session.messages) {
     messages.push({ role: m.role === 'user' ? 'user' : 'assistant', content: m.text });
   }
@@ -216,8 +223,13 @@ async function nextQuestion(session, userText, apiKey) {
 
 async function generateReport(session, apiKey) {
   const transcript = session.messages.map(m => `${m.role === 'user' ? '受访者' : '主持人'}：${m.text}`).join('\n\n');
+  let context = `研究目标："${session.goal}"\n`;
+  if (session.targetAudience) context += `目标受众：${session.targetAudience}\n`;
+  if (session.scenarios) context += `研究场景：${session.scenarios}\n`;
+  if (session.persona) context += `受访者画像/上下文：${session.persona}\n`;
+  if (session.methodology && session.methodology !== 'general') context += `采用方法学：${session.methodology}\n`;
   const prompt = `分析以下访谈记录，输出一份结构化研究报告。\n` +
-    `研究目标："${session.goal}"\n\n` +
+    `${context}\n` +
     `访谈记录：\n${transcript}\n\n` +
     `返回 JSON，格式如下：\n` +
     `{\n  "summary": "string",\n  "themes": [{"name": "string", "description": "string", "quotes": ["string"]}],\n  "insights": [{"finding": "string", "evidence": "string"}],\n  "sentiment": "string",\n  "recommendations": ["string"]\n}`;
@@ -241,19 +253,25 @@ async function generateReport(session, apiKey) {
 
 async function evaluateConversation(session, apiKey) {
   const transcript = session.messages.map(m => `${m.role === 'user' ? '受访者' : '主持人'}：${m.text}`).join('\n\n');
+  let context = `研究目标："${session.goal}"\n`;
+  if (session.targetAudience) context += `目标受众：${session.targetAudience}\n`;
+  if (session.scenarios) context += `研究场景：${session.scenarios}\n`;
+  if (session.persona) context += `受访者画像/上下文：${session.persona}\n`;
+  if (session.methodology && session.methodology !== 'general') context += `采用方法学：${session.methodology}\n`;
   const rubric = `\n` +
     `naturalness（自然度）: 问题是否像真人对话，不生硬。\n` +
     `relevance（相关性）: 问题是否紧扣研究目标。\n` +
     `probing（追问质量）: 是否基于受访者回答做了有效追问。\n` +
     `single_question（单一问题）: 是否一次只问一个问题。\n` +
     `no_bias（无偏见）: 是否避免引导性或偏见性语言。\n` +
-    `progression（阶段推进）: 访谈是否按阶段有序推进，没有跳阶段或反复。`;
+    `progression（阶段推进）: 访谈是否按阶段有序推进，没有跳阶段或反复。\n` +
+    `persona_fit（画像契合）: 问题是否符合目标受众与受访者画像。`;
   const prompt = `你是一位资深用户研究专家。请评估下面这段 AI 主持的访谈质量。\n\n` +
-    `研究目标："${session.goal}"\n\n` +
+    `${context}\n` +
     `访谈记录：\n${transcript}\n\n` +
     `评估维度（1-5 分，5 分最好）：${rubric}\n\n` +
     `返回 JSON：\n` +
-    `{\n  "scores": {"naturalness": 1, "relevance": 1, "probing": 1, "single_question": 1, "no_bias": 1, "progression": 1},\n  "overall_comment": "总体评价",\n  "top_strength": "最大优点",\n  "top_weakness": "最大改进点",\n  "bad_cases": [{"turn": 1, "issue": "问题"}]\n}`;
+    `{\n  "scores": {"naturalness": 1, "relevance": 1, "probing": 1, "single_question": 1, "no_bias": 1, "progression": 1, "persona_fit": 1},\n  "overall_comment": "总体评价",\n  "top_strength": "最大优点",\n  "top_weakness": "最大改进点",\n  "bad_cases": [{"turn": 1, "issue": "问题"}]\n}`;
   const raw = await providerChat({
     provider: session.provider,
     baseUrl: session.baseUrl,
@@ -312,6 +330,10 @@ const server = http.createServer(async (req, res) => {
     const session = {
       id,
       goal: body.goal,
+      targetAudience: body.targetAudience || '',
+      scenarios: body.scenarios || '',
+      persona: body.persona || '',
+      methodology: body.methodology || 'general',
       provider: body.provider,
       baseUrl: normalizeBaseUrl(body.provider, body.baseUrl),
       model: body.model,

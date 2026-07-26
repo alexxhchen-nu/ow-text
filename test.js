@@ -52,10 +52,16 @@ mockProvider.listen(3001, async () => {
     console.assert(models.models[0].id === 'mock-model', 'models list failed');
 
     // Start interview
-    const startRes = await fetch(`${base}/api/interview/start`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...cfg, goal: 'test goal' }) });
+    const startRes = await fetch(`${base}/api/interview/start`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...cfg, goal: 'test goal', targetAudience: 'test audience', scenarios: 'test scenario', persona: 'test persona', methodology: 'JTBD' }) });
     const start = await startRes.json();
     console.assert(start.message === 'mock-question', 'start question failed');
     console.assert(start.stage === 'opening', 'start stage failed');
+
+    // Verify session stored design fields
+    const sessionRes = await fetch(`${base}/api/interview/${start.id}`);
+    const session = await sessionRes.json();
+    console.assert(session.targetAudience === 'test audience', 'targetAudience not stored');
+    console.assert(session.methodology === 'JTBD', 'methodology not stored');
 
     // Send message
     const msgRes = await fetch(`${base}/api/interview/${start.id}/message`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: 'hello', apiKey: cfg.apiKey }) });

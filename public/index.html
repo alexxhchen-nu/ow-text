@@ -82,6 +82,28 @@
       <label for="goal" style="margin-top:16px">研究目标</label>
       <textarea id="goal" placeholder="例如：了解用户为什么在新手引导阶段流失"></textarea>
 
+      <div style="margin-top:20px; padding-top:16px; border-top:1px solid var(--border)">
+        <h3 style="margin:0 0 12px; font-size:1rem">访谈设计（可选）</h3>
+
+        <label for="methodology">方法学</label>
+        <select id="methodology">
+          <option value="general">通用</option>
+          <option value="JTBD">Jobs-to-be-Done</option>
+          <option value="5whys">五问法（5 Whys）</option>
+          <option value="star">STAR</option>
+          <option value="persona">Persona 画像</option>
+        </select>
+
+        <label for="targetAudience" style="margin-top:12px">目标受众</label>
+        <textarea id="targetAudience" placeholder="例如：25-35 岁一线城市 SaaS 产品经理，每天使用 3+ 工具"></textarea>
+
+        <label for="scenarios" style="margin-top:12px">研究场景</label>
+        <textarea id="scenarios" placeholder="例如：首次注册、付费决策、流失前最后一次登录"></textarea>
+
+        <label for="persona" style="margin-top:12px">受访者画像 / 上下文</label>
+        <textarea id="persona" placeholder="例如：时间紧张、关注 ROI、对数据敏感"></textarea>
+      </div>
+
       <div class="row" style="margin-top:16px">
         <button id="startBtn" class="btn" disabled>开始访谈</button>
       </div>
@@ -154,6 +176,16 @@
       };
     }
 
+    function getDesign() {
+      return {
+        goal: $('goal').value.trim(),
+        methodology: $('methodology').value,
+        targetAudience: $('targetAudience').value.trim(),
+        scenarios: $('scenarios').value.trim(),
+        persona: $('persona').value.trim(),
+      };
+    }
+
     $('fetchModelsBtn').onclick = async () => {
       const cfg = getConfig();
       if (!cfg.apiKey) return $('modelsError').textContent = '请先填写 API Key。';
@@ -175,15 +207,15 @@
     };
 
     $('startBtn').onclick = async () => {
-      const goal = $('goal').value.trim();
-      if (!goal) return $('setupError').textContent = '请输入研究目标。';
+      const design = getDesign();
+      if (!design.goal) return $('setupError').textContent = '请输入研究目标。';
       currentConfig = getConfig();
       if (!currentConfig.apiKey) return $('setupError').textContent = '请填写 API Key。';
       if (!currentConfig.model) return $('setupError').textContent = '请先获取并选择模型。';
       $('setupError').textContent = '';
       $('startBtn').disabled = true;
       try {
-        const { id, message, stage, reason } = await api('/api/interview/start', { method: 'POST', body: JSON.stringify({ ...currentConfig, goal }) });
+        const { id, message, stage, reason } = await api('/api/interview/start', { method: 'POST', body: JSON.stringify({ ...currentConfig, ...design }) });
         sessionId = id;
         hide($('setup'));
         show($('chat'));
@@ -246,7 +278,8 @@
         probing: '追问质量',
         single_question: '单一问题',
         no_bias: '无偏见',
-        progression: '阶段推进'
+        progression: '阶段推进',
+        persona_fit: '画像契合'
       };
       const scores = e.scores || {};
       const html = [
