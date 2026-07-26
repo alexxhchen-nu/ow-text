@@ -1,6 +1,15 @@
 import http from 'http';
 import { spawn } from 'child_process';
 
+const mockQuestion = JSON.stringify({ question: 'mock-question', stage: 'opening', reason: 'mock-reason', probe_target: '' });
+const mockEvaluate = JSON.stringify({
+  scores: { naturalness: 4, relevance: 4, probing: 3, single_question: 5, no_bias: 4, progression: 4 },
+  overall_comment: 'mock overall comment',
+  top_strength: 'mock strength',
+  top_weakness: 'mock weakness',
+  bad_cases: []
+});
+
 // Mock provider server
 const mockProvider = http.createServer((req, res) => {
   res.setHeader('Content-Type', 'application/json');
@@ -14,7 +23,9 @@ const mockProvider = http.createServer((req, res) => {
     }
     if (req.url === '/v1/chat/completions') {
       res.writeHead(200);
-      res.end(JSON.stringify({ choices: [{ message: { content: 'mock-question' } }] }) + 'data: [DONE]');
+      let content = mockQuestion;
+      if (body.includes('评估')) content = mockEvaluate;
+      res.end(JSON.stringify({ choices: [{ message: { content } }] }) + 'data: [DONE]');
       return;
     }
     if (req.url === '/v1/messages') {
@@ -44,6 +55,7 @@ mockProvider.listen(3001, async () => {
     const startRes = await fetch(`${base}/api/interview/start`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...cfg, goal: 'test goal' }) });
     const start = await startRes.json();
     console.assert(start.message === 'mock-question', 'start question failed');
+    console.assert(start.stage === 'opening', 'start stage failed');
 
     // Send message
     const msgRes = await fetch(`${base}/api/interview/${start.id}/message`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: 'hello', apiKey: cfg.apiKey }) });
@@ -54,6 +66,11 @@ mockProvider.listen(3001, async () => {
     const reportRes = await fetch(`${base}/api/interview/${start.id}/report`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ apiKey: cfg.apiKey }) });
     const report = await reportRes.json();
     console.assert(report.goal === 'test goal', 'report goal failed');
+
+    // Evaluate conversation
+    const evalRes = await fetch(`${base}/api/interview/${start.id}/evaluate`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ apiKey: cfg.apiKey }) });
+    const evaluation = await evalRes.json();
+    console.assert(evaluation.evaluation.overall_comment === 'mock overall comment', 'evaluate failed');
 
     console.log('All checks passed');
   } catch (e) {

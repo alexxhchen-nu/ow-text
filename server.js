@@ -15,6 +15,16 @@ const DEFAULT_BASE_URLS = {
   custom: '',
 };
 
+const STAGES = {
+  opening: { label: '开场', maxRounds: 1, instruction: '建立信任、说明目的，问一个轻松开放的问题。' },
+  background: { label: '背景', maxRounds: 2, instruction: '了解受访者基本情况、使用场景、相关背景。' },
+  core_exploration: { label: '核心探索', maxRounds: 3, instruction: '围绕研究目标深入探索需求、痛点、行为。' },
+  deep_probing: { label: '深度追问', maxRounds: 3, instruction: '对关键回答追问动机、感受、具体例子、因果关系。' },
+  closing: { label: '收尾', maxRounds: 99, instruction: '总结确认，感谢受访者，结束访谈。' },
+};
+
+const STAGE_ORDER = ['opening', 'background', 'core_exploration', 'deep_probing', 'closing'];
+
 async function ensureDataDir() {
   try { await fs.mkdir(DATA_DIR, { recursive: true }); } catch {}
 }
@@ -114,37 +124,94 @@ async function providerChat({ provider, baseUrl, apiKey, model, messages, jsonMo
   return data.choices?.[0]?.message?.content ?? '';
 }
 
+function determineStage(messages) {
+  const assistantCount = messages.filter(m => m.role === 'assistant').length;
+  let cumulative = 0;
+  for (const stage of STAGE_ORDER) {
+    cumulative += STAGES[stage].maxRounds;
+    if (assistantCount < cumulative) return stage;
+  }
+  return 'closing';
+}
+
+function stageDefinitions() {
+  return STAGE_ORDER.map(key => `- ${key}（${STAGES[key].label}）：${STAGES[key].instruction} 最多 ${STAGES[key].maxRounds} 轮`).join('\n');
+}
+
+function fewShotExamples() {
+  return `\n\n示例（用户研究目标：了解用户为什么在新手引导阶段流失）：\n` +
+    `---\n` +
+    `阶段 opening：\n` +
+    `问题：「你好，可以先简单聊聊你平时是怎么接触这类产品的吗？」\n` +
+    `原因：建立信任，降低受访者防御，开启对话。\n\n` +
+    `阶段 background：\n` +
+    `问题：「你最近一次注册类似产品时，印象最深的一步是什么？」\n` +
+    `原因：了解真实使用场景，为后续痛点探索做铺垫。\n\n` +
+    `阶段 core_exploration：\n` +
+    `问题：「你觉得新手引导里哪一步最让你困惑？」\n` +
+    `原因：直接围绕研究目标探索关键痛点。\n\n` +
+    `阶段 deep_probing：\n` +
+    `问题：「当时你为什么会觉得那一步很困惑？能描述一下你当时的想法吗？」\n` +
+    `原因：追问情绪和具体原因，避免表面回答。\n\n` +
+    `阶段 closing：\n` +
+    `问题：「谢谢你分享这些。如果让你给新手引导提一个建议，你会提什么？」\n` +
+    `原因：收尾前再确认一次核心观点。`;
+}
+
 function interviewerSystem(goal) {
   return `你是一位经验丰富的定性研究访谈主持人。\n` +
     `研究目标："${goal}"\n\n` +
+    `访谈阶段定义：\n${stageDefinitions()}\n\n` +
     `规则：\n` +
     `- 一次只问一个简洁的问题。\n` +
-    `- 听完回答后，用自然的方式追问动机、感受或具体例子。\n` +
-    `- 语气对话式、尊重受访者。\n` +
-    `- 大约 5-8 轮后，或目标已满足时，结束访谈并感谢受访者。\n` +
-    `- 访谈过程中不要给出分析、总结或列表，只给出下一个问题。`;
+    `- 语气自然、对话式，避免像问卷。\n` +
+    `- 追问时可以先简短回应受访者，再提下一个问题。\n` +
+    `- 不要给出分析、总结、bullet list。\n` +
+    `- 当接近收尾阶段时，主动结束访谈并感谢受访者。\n` +
+    `- 必须根据当前阶段选择合适的提问策略。\n` +
+    `- 输出必须是 JSON，格式如下：\n` +
+    `{\n  "question": "下一个问题",\n  "stage": "当前阶段英文名（opening/background/core_exploration/deep_probing/closing）",\n  "reason": "为什么选择这个问题，它如何服务于当前阶段或研究目标",\n  "probe_target": "如果这个问题是追问，追问的目标是什么（可选）"\n}` +
+    fewShotExamples();
 }
 
-async function generateFirstQuestion(session, apiKey) {
-  return providerChat({
-    provider: session.provider,
-    baseUrl: session.baseUrl,
-    apiKey,
-    model: session.model,
-    messages: [
-      { role: 'system', content: interviewerSystem(session.goal) },
-      { role: 'user', content: '生成一个温暖、开放式的问题来开始访谈。' },
-    ],
-  });
-}
-
-async function nextQuestion(session, userText, apiKey) {
+async function askQuestion({ session, apiKey, userText = null, stage = null }) {
   const messages = [{ role: 'system', content: interviewerSystem(session.goal) }];
   for (const m of session.messages) {
     messages.push({ role: m.role === 'user' ? 'user' : 'assistant', content: m.text });
   }
-  messages.push({ role: 'user', content: userText });
-  return providerChat({ provider: session.provider, baseUrl: session.baseUrl, apiKey, model: session.model, messages });
+  if (userText) messages.push({ role: 'user', content: userText });
+  const currentStage = stage || determineStage(session.messages);
+  messages.push({
+    role: 'user',
+    content: `请生成下一个问题。当前应处于阶段：${currentStage}（${STAGES[currentStage].label}）。严格输出 JSON，不要加 markdown 代码块。`,
+  });
+  const raw = await providerChat({
+    provider: session.provider,
+    baseUrl: session.baseUrl,
+    apiKey,
+    model: session.model,
+    messages,
+    jsonMode: true,
+  });
+  try {
+    const parsed = JSON.parse(extractFirstJson(raw));
+    return {
+      question: parsed.question || raw,
+      stage: parsed.stage || currentStage,
+      reason: parsed.reason || '',
+      probe_target: parsed.probe_target || '',
+    };
+  } catch {
+    return { question: raw, stage: currentStage, reason: '', probe_target: '' };
+  }
+}
+
+async function generateFirstQuestion(session, apiKey) {
+  return askQuestion({ session, apiKey, stage: 'opening' });
+}
+
+async function nextQuestion(session, userText, apiKey) {
+  return askQuestion({ session, apiKey, userText });
 }
 
 async function generateReport(session, apiKey) {
@@ -166,9 +233,42 @@ async function generateReport(session, apiKey) {
     jsonMode: true,
   });
   try {
-    return JSON.parse(raw);
+    return JSON.parse(extractFirstJson(raw));
   } catch {
     return { summary: raw, themes: [], insights: [], sentiment: 'unknown', recommendations: [] };
+  }
+}
+
+async function evaluateConversation(session, apiKey) {
+  const transcript = session.messages.map(m => `${m.role === 'user' ? '受访者' : '主持人'}：${m.text}`).join('\n\n');
+  const rubric = `\n` +
+    `naturalness（自然度）: 问题是否像真人对话，不生硬。\n` +
+    `relevance（相关性）: 问题是否紧扣研究目标。\n` +
+    `probing（追问质量）: 是否基于受访者回答做了有效追问。\n` +
+    `single_question（单一问题）: 是否一次只问一个问题。\n` +
+    `no_bias（无偏见）: 是否避免引导性或偏见性语言。\n` +
+    `progression（阶段推进）: 访谈是否按阶段有序推进，没有跳阶段或反复。`;
+  const prompt = `你是一位资深用户研究专家。请评估下面这段 AI 主持的访谈质量。\n\n` +
+    `研究目标："${session.goal}"\n\n` +
+    `访谈记录：\n${transcript}\n\n` +
+    `评估维度（1-5 分，5 分最好）：${rubric}\n\n` +
+    `返回 JSON：\n` +
+    `{\n  "scores": {"naturalness": 1, "relevance": 1, "probing": 1, "single_question": 1, "no_bias": 1, "progression": 1},\n  "overall_comment": "总体评价",\n  "top_strength": "最大优点",\n  "top_weakness": "最大改进点",\n  "bad_cases": [{"turn": 1, "issue": "问题"}]\n}`;
+  const raw = await providerChat({
+    provider: session.provider,
+    baseUrl: session.baseUrl,
+    apiKey,
+    model: session.model,
+    messages: [
+      { role: 'system', content: '你是一位严格的访谈质量评估专家，评分客观、具体。' },
+      { role: 'user', content: prompt },
+    ],
+    jsonMode: true,
+  });
+  try {
+    return JSON.parse(extractFirstJson(raw));
+  } catch {
+    return { scores: {}, overall_comment: raw, top_strength: '', top_weakness: '', bad_cases: [] };
   }
 }
 
@@ -218,10 +318,10 @@ const server = http.createServer(async (req, res) => {
       createdAt: new Date().toISOString(),
       messages: [],
     };
-    const firstQuestion = await generateFirstQuestion(session, body.apiKey);
-    session.messages.push({ role: 'assistant', text: firstQuestion });
+    const first = await generateFirstQuestion(session, body.apiKey);
+    session.messages.push({ role: 'assistant', text: first.question, stage: first.stage, reason: first.reason, probe_target: first.probe_target });
     await saveSession(session);
-    return json(res, 201, { id, message: firstQuestion });
+    return json(res, 201, { id, message: first.question, stage: first.stage, reason: first.reason, probe_target: first.probe_target });
   }
 
   const messageMatch = pathname.match(/^\/api\/interview\/([^/]+)\/message$/);
@@ -234,9 +334,9 @@ const server = http.createServer(async (req, res) => {
     if (!body.apiKey) return bad(res, 'apiKey is required');
     session.messages.push({ role: 'user', text: body.text, ts: new Date().toISOString() });
     const reply = await nextQuestion(session, body.text, body.apiKey);
-    session.messages.push({ role: 'assistant', text: reply, ts: new Date().toISOString() });
+    session.messages.push({ role: 'assistant', text: reply.question, stage: reply.stage, reason: reply.reason, probe_target: reply.probe_target, ts: new Date().toISOString() });
     await saveSession(session);
-    return json(res, 200, { message: reply });
+    return json(res, 200, { message: reply.question, stage: reply.stage, reason: reply.reason, probe_target: reply.probe_target });
   }
 
   const reportMatch = pathname.match(/^\/api\/interview\/([^/]+)\/report$/);
@@ -248,6 +348,17 @@ const server = http.createServer(async (req, res) => {
     if (!body.apiKey) return bad(res, 'apiKey is required');
     const report = await generateReport(session, body.apiKey);
     return json(res, 200, { id, goal: session.goal, report });
+  }
+
+  const evaluateMatch = pathname.match(/^\/api\/interview\/([^/]+)\/evaluate$/);
+  if (evaluateMatch && req.method === 'POST') {
+    const id = evaluateMatch[1];
+    const session = await loadSession(id);
+    if (!session) return json(res, 404, { error: 'session not found' });
+    const body = JSON.parse(await readBody(req) || '{}');
+    if (!body.apiKey) return bad(res, 'apiKey is required');
+    const evaluation = await evaluateConversation(session, body.apiKey);
+    return json(res, 200, { id, evaluation });
   }
 
   const sessionMatch = pathname.match(/^\/api\/interview\/([^/]+)$/);

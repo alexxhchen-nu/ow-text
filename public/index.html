@@ -41,6 +41,12 @@
     .hint { color: var(--muted); font-size: 0.85rem; margin-top: 4px; }
     .model-row { display: flex; gap: 10px; align-items: flex-start; }
     .model-row select { flex: 1; }
+    .msg-meta { font-size: 0.75rem; color: var(--muted); margin-top: 6px; line-height: 1.4; }
+    .eval-section { margin-top: 16px; }
+    .score { display: flex; justify-content: space-between; font-size: 0.9rem; padding: 6px 0; border-bottom: 1px solid var(--border); }
+    .score-bar-wrap { width: 100%; height: 6px; background: var(--border); border-radius: 3px; margin-top: 4px; }
+    .score-bar { height: 100%; background: var(--accent); border-radius: 3px; }
+    .comment { padding: 12px; background: var(--bg); border-radius: 8px; margin-top: 8px; }
   </style>
 </head>
 <body>
@@ -99,8 +105,12 @@
     <div id="report" class="card hidden report">
       <div class="row" style="justify-content:space-between; margin-bottom:16px">
         <h1>洞察报告</h1>
-        <button id="newBtn" class="btn secondary">新建访谈</button>
+        <div class="row" style="flex:0 0 auto">
+          <button id="evalBtn" class="btn secondary">评估访谈</button>
+          <button id="newBtn" class="btn secondary">新建访谈</button>
+        </div>
       </div>
+      <div id="evalContent"></div>
       <div id="reportContent"></div>
     </div>
   </div>
@@ -120,10 +130,17 @@
     function show(el) { el.classList.remove('hidden'); }
     function hide(el) { el.classList.add('hidden'); }
 
-    function appendMessage(role, text) {
+    function appendMessage(role, text, meta = {}) {
       const div = document.createElement('div');
       div.className = `msg ${role}`;
-      div.textContent = text;
+      let html = escapeHtml(text);
+      if (role === 'assistant' && (meta.stage || meta.reason)) {
+        html += `<div class="msg-meta">`;
+        if (meta.stage) html += `阶段：${escapeHtml(meta.stage)}${meta.stageLabel ? `（${escapeHtml(meta.stageLabel)}）` : ''}`;
+        if (meta.reason) html += `<br>追问理由：${escapeHtml(meta.reason)}`;
+        html += `</div>`;
+      }
+      div.innerHTML = html;
       $('messages').appendChild(div);
       $('messages').scrollTop = $('messages').scrollHeight;
     }
@@ -166,11 +183,11 @@
       $('setupError').textContent = '';
       $('startBtn').disabled = true;
       try {
-        const { id, message } = await api('/api/interview/start', { method: 'POST', body: JSON.stringify({ ...currentConfig, goal }) });
+        const { id, message, stage, reason } = await api('/api/interview/start', { method: 'POST', body: JSON.stringify({ ...currentConfig, goal }) });
         sessionId = id;
         hide($('setup'));
         show($('chat'));
-        appendMessage('assistant', message);
+        appendMessage('assistant', message, { stage, reason });
       } catch (e) {
         $('setupError').textContent = e.message;
         show($('setupError'));
@@ -185,8 +202,8 @@
       $('sendBtn').disabled = true;
       show($('typing'));
       try {
-        const { message } = await api(`/api/interview/${sessionId}/message`, { method: 'POST', body: JSON.stringify({ text, apiKey: currentConfig.apiKey }) });
-        appendMessage('assistant', message);
+        const { message, stage, reason } = await api(`/api/interview/${sessionId}/message`, { method: 'POST', body: JSON.stringify({ text, apiKey: currentConfig.apiKey }) });
+        appendMessage('assistant', message, { stage, reason });
       } catch (e) {
         $('chatError').textContent = e.message;
         show($('chatError'));
@@ -210,6 +227,42 @@
     };
 
     $('newBtn').onclick = () => { location.reload(); };
+
+    $('evalBtn').onclick = async () => {
+      $('evalBtn').disabled = true;
+      $('evalContent').textContent = '评估中…';
+      try {
+        const data = await api(`/api/interview/${sessionId}/evaluate`, { method: 'POST', body: JSON.stringify({ apiKey: currentConfig.apiKey }) });
+        renderEvaluation(data.evaluation);
+      } catch (e) {
+        $('evalContent').textContent = e.message;
+      } finally { $('evalBtn').disabled = false; }
+    };
+
+    function renderEvaluation(e) {
+      const dims = {
+        naturalness: '自然度',
+        relevance: '相关性',
+        probing: '追问质量',
+        single_question: '单一问题',
+        no_bias: '无偏见',
+        progression: '阶段推进'
+      };
+      const scores = e.scores || {};
+      const html = [
+        '<section class="eval-section"><h3>访谈质量评估</h3>',
+        Object.entries(dims).map(([key, label]) => {
+          const score = Number(scores[key]) || 0;
+          const pct = (score / 5 * 100) + '%';
+          return `<div class="score"><span>${label}</span><span>${score}/5</span></div><div class="score-bar-wrap"><div class="score-bar" style="width:${pct}"></div></div>`;
+        }).join(''),
+        `<div class="comment"><strong>总体评价</strong><p>${escapeHtml(e.overall_comment)}</p>`,
+        `<strong>最大优点</strong><p>${escapeHtml(e.top_strength)}</p>`,
+        `<strong>最大改进点</strong><p>${escapeHtml(e.top_weakness)}</p></div>`,
+        '</section>'
+      ].join('');
+      $('evalContent').innerHTML = html;
+    }
 
     function renderReport({ goal, report }) {
       const r = report;
