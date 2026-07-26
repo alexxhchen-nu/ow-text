@@ -14,7 +14,7 @@ const mockProvider = http.createServer((req, res) => {
     }
     if (req.url === '/v1/chat/completions') {
       res.writeHead(200);
-      res.end(JSON.stringify({ choices: [{ message: { content: 'mock-question' } }] }));
+      res.end(JSON.stringify({ choices: [{ message: { content: 'mock-question' } }] }) + 'data: [DONE]');
       return;
     }
     if (req.url === '/v1/messages') {

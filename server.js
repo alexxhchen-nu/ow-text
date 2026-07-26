@@ -35,6 +35,26 @@ function normalizeBaseUrl(provider, baseUrl) {
   return DEFAULT_BASE_URLS[provider] || '';
 }
 
+function extractFirstJson(text) {
+  let depth = 0, inString = false, escape = false, start = -1;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (escape) { escape = false; continue; }
+    if (ch === '\\') { escape = true; continue; }
+    if (ch === '"' && inString) { inString = false; continue; }
+    if (ch === '"' && !inString) { inString = true; continue; }
+    if (inString) continue;
+    if (ch === '{' || ch === '[') {
+      if (depth === 0) start = i;
+      depth++;
+    } else if ((ch === '}' || ch === ']') && depth > 0) {
+      depth--;
+      if (depth === 0) return text.slice(start, i + 1);
+    }
+  }
+  throw new Error('No valid JSON found in response');
+}
+
 async function listModels({ provider, baseUrl, apiKey }) {
   if (!apiKey) throw new Error('API key is required');
   const url = `${normalizeBaseUrl(provider, baseUrl)}/models`;
@@ -47,7 +67,8 @@ async function listModels({ provider, baseUrl, apiKey }) {
   }
   const res = await fetch(url, { headers });
   if (!res.ok) throw new Error(`Models endpoint ${res.status}: ${await res.text()}`);
-  const data = await res.json();
+  const text = await res.text();
+  const data = JSON.parse(extractFirstJson(text));
   const items = data.data || data.models || [];
   return items.map(m => ({ id: m.id, name: m.id })).sort((a, b) => a.id.localeCompare(b.id));
 }
@@ -75,7 +96,8 @@ async function providerChat({ provider, baseUrl, apiKey, model, messages, jsonMo
       body: JSON.stringify(body),
     });
     if (!res.ok) throw new Error(`Anthropic ${res.status}: ${await res.text()}`);
-    const data = await res.json();
+    const text = await res.text();
+    const data = JSON.parse(extractFirstJson(text));
     return data.content?.[0]?.text ?? '';
   }
   // OpenAI / OpenAI-compatible
@@ -87,7 +109,8 @@ async function providerChat({ provider, baseUrl, apiKey, model, messages, jsonMo
     body: JSON.stringify(body),
   });
   if (!res.ok) throw new Error(`Provider ${res.status}: ${await res.text()}`);
-  const data = await res.json();
+  const text = await res.text();
+  const data = JSON.parse(extractFirstJson(text));
   return data.choices?.[0]?.message?.content ?? '';
 }
 
