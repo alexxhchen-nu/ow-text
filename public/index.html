@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>OW Text Interview</title>
+  <style>
+    :root { --bg: #f6f6f8; --card: #fff; --text: #1a1a1a; --muted: #6b7280; --accent: #2563eb; --accent-light: #eff6ff; --border: #e5e7eb; }
+    @media (prefers-color-scheme: dark) { :root { --bg: #0f172a; --card: #1e293b; --text: #f8fafc; --muted: #94a3b8; --accent: #60a5fa; --accent-light: #1e3a8a; --border: #334155; } }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif; background: var(--bg); color: var(--text); line-height: 1.5; }
+    .container { max-width: 720px; margin: 0 auto; padding: 24px; }
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+    h1 { margin: 0 0 8px; font-size: 1.5rem; }
+    .subtitle { color: var(--muted); margin: 0 0 24px; }
+    label { display: block; font-weight: 500; margin-bottom: 6px; }
+    textarea, input[type="text"] { width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text); font: inherit; }
+    textarea { min-height: 90px; resize: vertical; }
+    .btn { display: inline-flex; align-items: center; gap: 6px; padding: 10px 18px; border: 0; border-radius: 8px; background: var(--accent); color: white; font: inherit; font-weight: 500; cursor: pointer; }
+    .btn:disabled { opacity: 0.6; cursor: not-allowed; }
+    .btn.secondary { background: transparent; color: var(--text); border: 1px solid var(--border); }
+    .row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+    .chat { display: flex; flex-direction: column; gap: 12px; max-height: 60vh; overflow-y: auto; padding: 8px 0; }
+    .msg { padding: 12px 16px; border-radius: 12px; max-width: 85%; white-space: pre-wrap; }
+    .msg.user { align-self: flex-end; background: var(--accent); color: white; }
+    .msg.assistant { align-self: flex-start; background: var(--accent-light); border: 1px solid var(--border); }
+    .input-area { display: flex; gap: 10px; margin-top: 12px; }
+    .input-area textarea { flex: 1; min-height: 60px; }
+    .hidden { display: none !important; }
+    .spinner { width: 16px; height: 16px; border: 2px solid currentColor; border-bottom-color: transparent; border-radius: 50%; animation: spin 1s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .report h2 { margin-top: 0; }
+    .report section { margin-bottom: 24px; }
+    .report h3 { font-size: 1rem; margin-bottom: 8px; }
+    .report ul { padding-left: 20px; }
+    .quote { font-style: italic; color: var(--muted); border-left: 3px solid var(--accent); padding-left: 12px; margin: 8px 0; }
+    .error { color: #dc2626; background: #fef2f2; padding: 12px; border-radius: 8px; margin-bottom: 12px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div id="setup" class="card">
+      <h1>OW Text Interview</h1>
+      <p class="subtitle">AI-moderated user interviews that turn conversation into insight reports.</p>
+      <label for="goal">What do you want to learn?</label>
+      <textarea id="goal" placeholder="e.g. Understand why users churn during onboarding"></textarea>
+      <div class="row" style="margin-top:16px">
+        <button id="startBtn" class="btn">Start Interview</button>
+      </div>
+      <div id="setupError" class="error hidden"></div>
+    </div>
+
+    <div id="chat" class="card hidden">
+      <div class="row" style="justify-content:space-between; margin-bottom:12px">
+        <h1 style="font-size:1.25rem">Interview</h1>
+        <button id="endBtn" class="btn secondary">End & Report</button>
+      </div>
+      <div id="messages" class="chat"></div>
+      <div id="typing" class="hidden" style="color:var(--muted); padding:8px 0">Interviewer is typing…</div>
+      <div class="input-area">
+        <textarea id="answer" placeholder="Type your answer…"></textarea>
+        <button id="sendBtn" class="btn">Send</button>
+      </div>
+      <div id="chatError" class="error hidden"></div>
+    </div>
+
+    <div id="report" class="card hidden report">
+      <div class="row" style="justify-content:space-between; margin-bottom:16px">
+        <h1>Insight Report</h1>
+        <button id="newBtn" class="btn secondary">New Interview</button>
+      </div>
+      <div id="reportContent"></div>
+    </div>
+  </div>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    let sessionId = null;
+
+    async function api(url, opts = {}) {
+      const res = await fetch(url, { headers: { 'Content-Type': 'application/json' }, ...opts });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      return data;
+    }
+
+    function show(el) { el.classList.remove('hidden'); }
+    function hide(el) { el.classList.add('hidden'); }
+
+    function appendMessage(role, text) {
+      const div = document.createElement('div');
+      div.className = `msg ${role}`;
+      div.textContent = text;
+      $('messages').appendChild(div);
+      $('messages').scrollTop = $('messages').scrollHeight;
+    }
+
+    $('startBtn').onclick = async () => {
+      const goal = $('goal').value.trim();
+      if (!goal) return $('setupError').textContent = 'Enter a research goal.';
+      $('setupError').textContent = '';
+      $('startBtn').disabled = true;
+      try {
+        const { id, message } = await api('/api/interview/start', { method: 'POST', body: JSON.stringify({ goal }) });
+        sessionId = id;
+        hide($('setup'));
+        show($('chat'));
+        appendMessage('assistant', message);
+      } catch (e) {
+        $('setupError').textContent = e.message;
+        show($('setupError'));
+      } finally { $('startBtn').disabled = false; }
+    };
+
+    async function send() {
+      const text = $('answer').value.trim();
+      if (!text || !sessionId) return;
+      $('answer').value = '';
+      appendMessage('user', text);
+      $('sendBtn').disabled = true;
+      show($('typing'));
+      try {
+        const { message } = await api(`/api/interview/${sessionId}/message`, { method: 'POST', body: JSON.stringify({ text }) });
+        appendMessage('assistant', message);
+      } catch (e) {
+        $('chatError').textContent = e.message;
+        show($('chatError'));
+      } finally { hide($('typing')); $('sendBtn').disabled = false; $('answer').focus(); }
+    }
+
+    $('sendBtn').onclick = send;
+    $('answer').addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } });
+
+    $('endBtn').onclick = async () => {
+      $('endBtn').disabled = true;
+      try {
+        const data = await api(`/api/interview/${sessionId}/report`);
+        renderReport(data);
+        hide($('chat'));
+        show($('report'));
+      } catch (e) {
+        $('chatError').textContent = e.message;
+        show($('chatError'));
+      } finally { $('endBtn').disabled = false; }
+    };
+
+    $('newBtn').onclick = () => { location.reload(); };
+
+    function renderReport({ goal, report }) {
+      const r = report;
+      const html = [
+        `<section><h3>Goal</h3><p>${escapeHtml(goal)}</p></section>`,
+        `<section><h3>Summary</h3><p>${escapeHtml(r.summary)}</p></section>`,
+        `<section><h3>Sentiment</h3><p>${escapeHtml(r.sentiment)}</p></section>`,
+        r.themes?.length ? `<section><h3>Themes</h3>` + r.themes.map(t =>
+          `<div><strong>${escapeHtml(t.name)}</strong><p>${escapeHtml(t.description)}</p>` +
+          (t.quotes?.length ? t.quotes.map(q => `<div class="quote">"${escapeHtml(q)}"</div>`).join('') : '') + `</div>`
+        ).join('') + `</section>` : '',
+        r.insights?.length ? `<section><h3>Insights</h3><ul>` + r.insights.map(i =>
+          `<li><strong>${escapeHtml(i.finding)}</strong> <span style="color:var(--muted)">— ${escapeHtml(i.evidence)}</span></li>`
+        ).join('') + `</ul></section>` : '',
+        r.recommendations?.length ? `<section><h3>Recommendations</h3><ul>` + r.recommendations.map(x => `<li>${escapeHtml(x)}</li>`).join('') + `</ul></section>` : ''
+      ].join('');
+      $('reportContent').innerHTML = html;
+    }
+
+    function escapeHtml(s) { return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+  </script>
+</body>
+</html>
