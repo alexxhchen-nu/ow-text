@@ -10,9 +10,9 @@
     body { margin: 0; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif; background: var(--bg); color: var(--text); line-height: 1.5; }
     body::before { content: ""; position: fixed; inset: 0; pointer-events: none; background: radial-gradient(circle at 12% 0%, rgba(200,16,46,0.08), transparent 32%), linear-gradient(90deg, rgba(21,21,21,0.035) 1px, transparent 1px); background-size: auto, 72px 72px; }
     .container { position: relative; max-width: 980px; margin: 0 auto; padding: 32px 24px 56px; }
-    .brand { display: flex; align-items: center; justify-content: space-between; gap: 24px; margin-bottom: 28px; }
-    .brand img { width: min(230px, 58vw); height: auto; display: block; }
-    .brand-mark { color: var(--muted); font-size: 0.78rem; letter-spacing: 0.18em; text-transform: uppercase; }
+    .brand { display: flex; align-items: center; justify-content: flex-start; margin-bottom: 28px; padding-bottom: 18px; border-bottom: 1px solid var(--border); }
+    .brand img { width: min(188px, 52vw); height: auto; display: block; }
+    .brand-mark { display: none; }
     .card { background: rgba(255,255,255,0.94); border: 1px solid var(--border); border-radius: 28px; padding: clamp(22px, 4vw, 42px); box-shadow: 0 24px 70px var(--shadow); backdrop-filter: blur(10px); }
     .card::before { content: ""; display: block; width: 64px; height: 5px; margin-bottom: 24px; border-radius: 999px; background: var(--accent); }
     h1 { margin: 0 0 10px; font-size: clamp(2rem, 5vw, 4rem); line-height: 0.95; letter-spacing: -0.055em; }
@@ -64,8 +64,21 @@
     .progress strong { display: block; color: var(--text); margin-bottom: 6px; }
     .progress-bar { height: 7px; background: #ffd8de; border-radius: 999px; overflow: hidden; }
     .progress-bar span { display: block; height: 100%; width: 35%; background: var(--accent); border-radius: inherit; animation: progressPulse 1.2s ease-in-out infinite alternate; }
+    .insight-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 18px 0; }
+    .metric-card, .insight-card { padding: 16px; border: 1px solid var(--border); border-radius: 18px; background: var(--field); }
+    .metric-value { font-size: 2.1rem; line-height: 1; font-weight: 760; letter-spacing: -0.05em; }
+    .metric-label, .eyebrow { color: var(--muted); font-size: 0.78rem; letter-spacing: 0.12em; text-transform: uppercase; }
+    .pill-row { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 18px; }
+    .pill { display: inline-flex; align-items: center; gap: 6px; padding: 7px 10px; border-radius: 999px; background: var(--accent-light); color: var(--accent-strong); font-size: 0.86rem; border: 1px solid #ffd8de; }
+    .bar-list { display: grid; gap: 10px; margin: 16px 0; }
+    .bar-item { display: grid; grid-template-columns: 88px 1fr 42px; gap: 10px; align-items: center; font-size: 0.9rem; }
+    .bar-track { height: 9px; overflow: hidden; border-radius: 999px; background: var(--border); }
+    .bar-track span { display: block; height: 100%; border-radius: inherit; background: var(--accent); }
+    .insight-list { display: grid; gap: 10px; margin: 12px 0; }
+    .insight-card strong { display: block; margin-bottom: 6px; }
+    .quick-summary { font-size: 1.15rem; line-height: 1.45; letter-spacing: -0.02em; margin: 8px 0 16px; }
     @keyframes progressPulse { to { width: 88%; } }
-    @media (max-width: 640px) { .container { padding: 22px 14px 40px; } .brand { align-items: flex-start; flex-direction: column; } .input-area { flex-direction: column; } .row > .btn, .btn { width: 100%; } .model-row { flex-direction: column; } .model-row .btn { margin-top: 0 !important; } }
+    @media (max-width: 640px) { .container { padding: 22px 14px 40px; } .brand { align-items: flex-start; flex-direction: column; } .input-area { flex-direction: column; } .row > .btn, .btn { width: 100%; } .model-row { flex-direction: column; } .model-row .btn { margin-top: 0 !important; } .insight-grid { grid-template-columns: 1fr; } .bar-item { grid-template-columns: 76px 1fr 36px; } }
   </style>
 </head>
 <body>
@@ -393,24 +406,43 @@
       const dims = {
         naturalness: '自然度',
         relevance: '相关性',
-        probing: '追问质量',
-        single_question: '单一问题',
-        no_bias: '无偏见',
-        progression: '节奏推进',
-        ending: '自然结束',
-        persona_fit: '画像契合'
+        probing: '追问',
+        single_question: '单问',
+        no_bias: '中立',
+        progression: '节奏',
+        ending: '收尾',
+        persona_fit: '契合'
       };
       const scores = e.scores || {};
+      const vals = Object.keys(dims).map(k => Number(scores[k]) || 0);
+      const avg = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
+      const weak = Object.entries(dims).sort(([a], [b]) => (scores[a] || 0) - (scores[b] || 0)).slice(0, 3).map(([, label]) => label);
+      const strong = Object.entries(dims).sort(([a], [b]) => (scores[b] || 0) - (scores[a] || 0)).slice(0, 3).map(([, label]) => label);
       const html = [
-        '<section class="eval-section"><h3>访谈质量评估</h3>',
+        '<section class="eval-section">',
+        '<div class="eyebrow">Interview quality</div>',
+        '<div class="insight-grid">',
+        `<div class="metric-card"><div class="metric-value">${avg.toFixed(1)}</div><div class="metric-label">平均分 / 5</div></div>`,
+        `<div class="metric-card"><div class="metric-value">${strong[0] || '-'}</div><div class="metric-label">最强维度</div></div>`,
+        `<div class="metric-card"><div class="metric-value">${weak[0] || '-'}</div><div class="metric-label">优先优化</div></div>`,
+        '</div>',
+        `<p class="quick-summary">${escapeHtml(e.overall_comment || '暂无总体评价')}</p>`,
+        '<div class="pill-row">',
+        ...strong.map(x => `<span class="pill">优势：${escapeHtml(x)}</span>`),
+        ...weak.map(x => `<span class="pill">改进：${escapeHtml(x)}</span>`),
+        '</div>',
+        '<div class="bar-list">',
         Object.entries(dims).map(([key, label]) => {
           const score = Number(scores[key]) || 0;
-          const pct = (score / 5 * 100) + '%';
-          return `<div class="score"><span>${label}</span><span>${score}/5</span></div><div class="score-bar-wrap"><div class="score-bar" style="width:${pct}"></div></div>`;
+          const pct = Math.max(0, Math.min(100, score / 5 * 100));
+          return `<div class="bar-item"><span>${label}</span><div class="bar-track"><span style="width:${pct}%"></span></div><strong>${score}/5</strong></div>`;
         }).join(''),
-        `<div class="comment"><strong>总体评价</strong><p>${escapeHtml(e.overall_comment)}</p>`,
-        `<strong>最大优点</strong><p>${escapeHtml(e.top_strength)}</p>`,
-        `<strong>最大改进点</strong><p>${escapeHtml(e.top_weakness)}</p></div>`,
+        '</div>',
+        '<div class="insight-grid">',
+        `<div class="insight-card"><div class="eyebrow">最大优点</div><strong>${escapeHtml(e.top_strength || '暂无')}</strong></div>`,
+        `<div class="insight-card"><div class="eyebrow">最大改进点</div><strong>${escapeHtml(e.top_weakness || '暂无')}</strong></div>`,
+        `<div class="insight-card"><div class="eyebrow">关键词</div><div class="pill-row">${keywordsFromText([e.overall_comment, e.top_strength, e.top_weakness].join(' ')).map(k => `<span class="pill">${escapeHtml(k)}</span>`).join('')}</div></div>`,
+        '</div>',
         '</section>'
       ].join('');
       $('evalContent').innerHTML = html;
@@ -418,20 +450,40 @@
 
     function renderReport({ goal, report }) {
       const r = report;
+      const themeNames = (r.themes || []).map(t => t.name).filter(Boolean);
+      const insightNames = (r.insights || []).map(i => i.finding).filter(Boolean);
+      const keywords = keywordsFromText([goal, r.summary, r.sentiment, ...themeNames, ...insightNames].join(' '));
       const html = [
-        `<section><h3>研究目标</h3><p>${escapeHtml(goal)}</p></section>`,
-        `<section><h3>摘要</h3><p>${escapeHtml(r.summary)}</p></section>`,
-        `<section><h3>情绪</h3><p>${escapeHtml(r.sentiment)}</p></section>`,
-        r.themes?.length ? `<section><h3>主题</h3>` + r.themes.map(t =>
-          `<div><strong>${escapeHtml(t.name)}</strong><p>${escapeHtml(t.description)}</p>` +
-          (t.quotes?.length ? t.quotes.map(q => `<div class="quote">"${escapeHtml(q)}"</div>`).join('') : '') + `</div>`
-        ).join('') + `</section>` : '',
-        r.insights?.length ? `<section><h3>洞察</h3><ul>` + r.insights.map(i =>
-          `<li><strong>${escapeHtml(i.finding)}</strong> <span style="color:var(--muted)">— ${escapeHtml(i.evidence)}</span></li>`
-        ).join('') + `</ul></section>` : '',
-        r.recommendations?.length ? `<section><h3>建议</h3><ul>` + r.recommendations.map(x => `<li>${escapeHtml(x)}</li>`).join('') + `</ul></section>` : ''
+        '<section>',
+        '<div class="eyebrow">Research goal</div>',
+        `<p class="quick-summary">${escapeHtml(goal)}</p>`,
+        '<div class="insight-grid">',
+        `<div class="metric-card"><div class="metric-value">${(r.themes || []).length}</div><div class="metric-label">主题</div></div>`,
+        `<div class="metric-card"><div class="metric-value">${(r.insights || []).length}</div><div class="metric-label">洞察</div></div>`,
+        `<div class="metric-card"><div class="metric-value">${(r.recommendations || []).length}</div><div class="metric-label">建议</div></div>`,
+        '</div>',
+        `<div class="insight-card"><div class="eyebrow">一句话摘要</div><p class="quick-summary">${escapeHtml(r.summary || '暂无摘要')}</p></div>`,
+        keywords.length ? `<div class="pill-row">${keywords.map(k => `<span class="pill">${escapeHtml(k)}</span>`).join('')}</div>` : '',
+        r.sentiment ? `<div class="insight-card"><div class="eyebrow">情绪 / 动机线索</div><strong>${escapeHtml(r.sentiment)}</strong></div>` : '',
+        r.themes?.length ? '<h3>主题地图</h3><div class="insight-list">' + r.themes.map(t =>
+          `<div class="insight-card"><strong>${escapeHtml(t.name)}</strong><p>${escapeHtml(t.description)}</p>${t.quotes?.length ? t.quotes.map(q => `<div class="quote">"${escapeHtml(q)}"</div>`).join('') : ''}</div>`
+        ).join('') + '</div>' : '',
+        r.insights?.length ? '<h3>关键洞察</h3><div class="insight-list">' + r.insights.map(i =>
+          `<div class="insight-card"><strong>${escapeHtml(i.finding)}</strong><p>${escapeHtml(i.evidence)}</p></div>`
+        ).join('') + '</div>' : '',
+        r.recommendations?.length ? '<h3>下一步建议</h3><div class="insight-list">' + r.recommendations.map(x => `<div class="insight-card">${escapeHtml(x)}</div>`).join('') + '</div>' : '',
+        '</section>'
       ].join('');
       $('reportContent').innerHTML = html;
+    }
+
+    function keywordsFromText(text) {
+      const stop = new Set(['一个','一些','这个','那个','目前','进行','使用','访谈','问题','用户','可以','需要','因为','所以','但是','以及','是否','没有','时候','总体','最大','优点','改进点','评价','the','and','with']);
+      return Array.from(String(text).match(/[\u4e00-\u9fa5]{2,6}|[A-Za-z][A-Za-z-]{2,}/g) || [])
+        .map(x => x.trim())
+        .filter(x => !stop.has(x.toLowerCase()))
+        .filter((x, i, a) => a.indexOf(x) === i)
+        .slice(0, 10);
     }
 
     function escapeHtml(s) { return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }

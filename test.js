@@ -42,8 +42,14 @@ const mockProvider = http.createServer((req, res) => {
         if (!body.includes('不要重复已经问过的问题')) throw new Error('missing dedupe guard');
         content = mockDecision;
       }
-      else if (body.includes('评估下面这段')) content = mockEvaluate;
-      else if (body.includes('结构化研究报告')) content = mockReport;
+      else if (body.includes('评估下面这段')) {
+        if (!body.includes('所有字段必须使用简体中文')) throw new Error('missing evaluation language guard');
+        content = mockEvaluate;
+      }
+      else if (body.includes('结构化研究报告')) {
+        if (!body.includes('所有字段必须使用简体中文')) throw new Error('missing report language guard');
+        content = mockReport;
+      }
       res.end(JSON.stringify({ choices: [{ message: { content } }] }) + 'data: [DONE]');
       return;
     }

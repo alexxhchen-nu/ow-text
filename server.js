@@ -290,7 +290,7 @@ async function generateReport(session, apiKey) {
     `${ctx}\n` +
     `访谈框架：\n${fw.topics.map(t => `- ${t.name}：${t.goal}`).join('\n')}\n\n` +
     `访谈记录：\n${transcriptText(session)}\n\n` +
-    `返回 JSON，格式如下：\n` +
+    `返回 JSON，格式如下。所有字段必须使用简体中文，不得出现越南语、英语或其他语言：\n` +
     `{\n  "summary": "string",\n  "themes": [{"name": "string", "description": "string", "quotes": ["string"]}],\n  "insights": [{"finding": "string", "evidence": "string"}],\n  "sentiment": "string",\n  "recommendations": ["string"]\n}`;
   const raw = await providerChat({
     provider: session.provider,
@@ -298,7 +298,7 @@ async function generateReport(session, apiKey) {
     apiKey,
     model: session.model,
     messages: [
-      { role: 'system', content: '你是一位资深用户研究专家，擅长撰写简洁、有证据支撑的研究报告。' },
+      { role: 'system', content: '你是一位资深用户研究专家，擅长撰写简洁、有证据支撑的研究报告。所有输出必须使用简体中文；不得夹杂越南语、英语或其他语言。' },
       { role: 'user', content: prompt },
     ],
     jsonMode: true,
@@ -326,7 +326,7 @@ async function evaluateConversation(session, apiKey) {
     `访谈框架：\n${session.framework.topics.map(t => `- ${t.name}：${t.goal}`).join('\n')}\n\n` +
     `访谈记录：\n${transcriptText(session)}\n\n` +
     `评估维度（1-5 分，5 分最好）：${rubric}\n\n` +
-    `返回 JSON：\n` +
+    `返回 JSON。所有字段必须使用简体中文，不得出现越南语、英语或其他语言：\n` +
     `{\n  "scores": {"naturalness": 1, "relevance": 1, "probing": 1, "single_question": 1, "no_bias": 1, "progression": 1, "ending": 1, "persona_fit": 1},\n  "overall_comment": "总体评价",\n  "top_strength": "最大优点",\n  "top_weakness": "最大改进点",\n  "bad_cases": [{"turn": 1, "issue": "问题"}]\n}`;
   const raw = await providerChat({
     provider: session.provider,
@@ -334,7 +334,7 @@ async function evaluateConversation(session, apiKey) {
     apiKey,
     model: session.model,
     messages: [
-      { role: 'system', content: '你是一位严格的访谈质量评估专家，评分客观、具体。' },
+      { role: 'system', content: '你是一位严格的访谈质量评估专家，评分客观、具体。所有输出必须使用简体中文；不得夹杂越南语、英语或其他语言。' },
       { role: 'user', content: prompt },
     ],
     jsonMode: true,
