@@ -15,16 +15,6 @@ const DEFAULT_BASE_URLS = {
   custom: '',
 };
 
-const STAGES = {
-  opening: { label: '开场', maxRounds: 1, instruction: '建立信任、说明目的，问一个轻松开放的问题。' },
-  background: { label: '背景', maxRounds: 2, instruction: '了解受访者基本情况、使用场景、相关背景。' },
-  core_exploration: { label: '核心探索', maxRounds: 3, instruction: '围绕研究目标深入探索需求、痛点、行为。' },
-  deep_probing: { label: '深度追问', maxRounds: 3, instruction: '对关键回答追问动机、感受、具体例子、因果关系。' },
-  closing: { label: '收尾', maxRounds: 99, instruction: '总结确认，感谢受访者，结束访谈。' },
-};
-
-const STAGE_ORDER = ['opening', 'background', 'core_exploration', 'deep_probing', 'closing'];
-
 async function ensureDataDir() {
   try { await fs.mkdir(DATA_DIR, { recursive: true }); } catch {}
 }
@@ -110,7 +100,6 @@ async function providerChat({ provider, baseUrl, apiKey, model, messages, jsonMo
     const data = JSON.parse(extractFirstJson(text));
     return data.content?.[0]?.text ?? '';
   }
-  // OpenAI / OpenAI-compatible
   const body = { model, messages };
   if (jsonMode) body.response_format = { type: 'json_object' };
   const res = await fetch(`${base}/chat/completions`, {
@@ -124,113 +113,180 @@ async function providerChat({ provider, baseUrl, apiKey, model, messages, jsonMo
   return data.choices?.[0]?.message?.content ?? '';
 }
 
-function determineStage(messages) {
-  const assistantCount = messages.filter(m => m.role === 'assistant').length;
-  let cumulative = 0;
-  for (const stage of STAGE_ORDER) {
-    cumulative += STAGES[stage].maxRounds;
-    if (assistantCount < cumulative) return stage;
+function designContext(design) {
+  const { goal, targetAudience, scenarios, persona, methodology } = design;
+  let ctx = `研究目标："${goal}"\n`;
+  if (targetAudience) ctx += `目标受众：${targetAudience}\n`;
+  if (scenarios) ctx += `研究场景：${scenarios}\n`;
+  if (persona) ctx += `受访者画像/上下文：${persona}\n`;
+  if (methodology && methodology !== 'general') ctx += `采用方法学：${methodology}\n`;
+  return ctx;
+}
+
+function validateFramework(fw) {
+  if (!fw || !Array.isArray(fw.topics) || fw.topics.length === 0) return false;
+  for (const t of fw.topics) {
+    if (!t.id || !t.name || !t.goal) return false;
   }
-  return 'closing';
+  return true;
 }
 
-function stageDefinitions() {
-  return STAGE_ORDER.map(key => `- ${key}（${STAGES[key].label}）：${STAGES[key].instruction} 最多 ${STAGES[key].maxRounds} 轮`).join('\n');
-}
-
-function fewShotExamples() {
-  return `\n\n示例（用户研究目标：了解用户为什么在新手引导阶段流失）：\n` +
-    `---\n` +
-    `阶段 opening：\n` +
-    `问题：「你好，可以先简单聊聊你平时是怎么接触这类产品的吗？」\n` +
-    `原因：建立信任，降低受访者防御，开启对话。\n\n` +
-    `阶段 background：\n` +
-    `问题：「你最近一次注册类似产品时，印象最深的一步是什么？」\n` +
-    `原因：了解真实使用场景，为后续痛点探索做铺垫。\n\n` +
-    `阶段 core_exploration：\n` +
-    `问题：「你觉得新手引导里哪一步最让你困惑？」\n` +
-    `原因：直接围绕研究目标探索关键痛点。\n\n` +
-    `阶段 deep_probing：\n` +
-    `问题：「当时你为什么会觉得那一步很困惑？能描述一下你当时的想法吗？」\n` +
-    `原因：追问情绪和具体原因，避免表面回答。\n\n` +
-    `阶段 closing：\n` +
-    `问题：「谢谢你分享这些。如果让你给新手引导提一个建议，你会提什么？」\n` +
-    `原因：收尾前再确认一次核心观点。`;
-}
-
-function interviewerSystem(session) {
-  const { goal, targetAudience, scenarios, persona, methodology } = session;
-  let context = `研究目标："${goal}"\n`;
-  if (targetAudience) context += `目标受众：${targetAudience}\n`;
-  if (scenarios) context += `研究场景：${scenarios}\n`;
-  if (persona) context += `受访者画像/上下文：${persona}\n`;
-  if (methodology && methodology !== 'general') context += `采用方法学：${methodology}\n`;
-  return `你是一位经验丰富的定性研究访谈主持人。\n` +
-    `${context}\n` +
-    `访谈阶段定义：\n${stageDefinitions()}\n\n` +
-    `规则：\n` +
-    `- 一次只问一个简洁的问题。\n` +
-    `- 语气自然、对话式，避免像问卷。\n` +
-    `- 追问时可以先简短回应受访者，再提下一个问题。\n` +
-    `- 不要给出分析、总结、bullet list。\n` +
-    `- 当接近收尾阶段时，主动结束访谈并感谢受访者。\n` +
-    `- 必须根据当前阶段选择合适的提问策略。\n` +
-    `- 必须结合目标受众、场景和画像调整措辞，让受访者感到问题与自己相关。\n` +
+async function generateFramework(design, apiKey, provider, baseUrl, model) {
+  const ctx = designContext(design);
+  const prompt = `你是一位资深用户研究设计师。请根据下面的研究设计，生成一份结构化访谈框架。\n\n` +
+    `${ctx}\n\n` +
+    `要求：\n` +
+    `- 把访谈拆成 4-8 个话题（topic），每个话题有清晰的目标。\n` +
+    `- 每个话题包含：id、name（话题名称）、goal（探索目标）、stage（建议进入阶段：introduce/explore/probe/confirm）、min_questions（最少问题数）、max_questions（最多问题数）、focus_prompt（提问时的关注焦点）。\n` +
+    `- 提供 3-5 条自然结束标准。\n` +
     `- 输出必须是 JSON，格式如下：\n` +
-    `{\n  "question": "下一个问题",\n  "stage": "当前阶段英文名（opening/background/core_exploration/deep_probing/closing）",\n  "reason": "为什么选择这个问题，它如何服务于当前阶段、目标受众或研究目标",\n  "probe_target": "如果这个问题是追问，追问的目标是什么（可选）"\n}` +
-    fewShotExamples();
+    `{\n  "topics": [{\n    "id": "t1",\n    "name": "string",\n    "goal": "string",\n    "stage": "introduce",\n    "min_questions": 2,\n    "max_questions": 5,\n    "focus_prompt": "string"\n  }],\n  "endingCriteria": ["string"],\n  "estimatedTurns": 12\n}`;
+  const raw = await providerChat({
+    provider, baseUrl, apiKey, model,
+    messages: [
+      { role: 'system', content: '你是一位资深用户研究设计师，擅长把研究目标拆成可执行、可追踪的访谈话题。' },
+      { role: 'user', content: prompt },
+    ],
+    jsonMode: true,
+  });
+  try {
+    const fw = JSON.parse(extractFirstJson(raw));
+    if (!validateFramework(fw)) throw new Error('invalid framework structure');
+    return fw;
+  } catch {
+    return { topics: defaultTopics(design), endingCriteria: defaultEndingCriteria(), estimatedTurns: 12 };
+  }
 }
 
-async function askQuestion({ session, apiKey, userText = null, stage = null }) {
-  const messages = [{ role: 'system', content: interviewerSystem(session) }];
-  for (const m of session.messages) {
-    messages.push({ role: m.role === 'user' ? 'user' : 'assistant', content: m.text });
+function defaultTopics(design) {
+  return [
+    { id: 't1', name: '开场与背景', goal: '建立信任并了解受访者基本情况', stage: 'introduce', min_questions: 2, max_questions: 3, focus_prompt: '让对方感到轻松，收集基本背景' },
+    { id: 't2', name: '核心探索', goal: `深入理解研究目标：${design.goal}`, stage: 'explore', min_questions: 3, max_questions: 6, focus_prompt: '围绕研究目标收集事实、行为和痛点' },
+    { id: 't3', name: '深度追问', goal: '挖掘动机、感受和具体例子', stage: 'probe', min_questions: 2, max_questions: 4, focus_prompt: '追问为什么、情绪和具体场景' },
+    { id: 't4', name: '收尾确认', goal: '总结关键信息并感谢受访者', stage: 'confirm', min_questions: 1, max_questions: 2, focus_prompt: '确认理解无误，给对方补充机会' },
+  ];
+}
+
+function defaultEndingCriteria() {
+  return [
+    '所有话题已充分探索，受访者没有提供新的信息',
+    '受访者明确表示结束或没有更多内容',
+    '主持人已连续确认两次，受访者没有补充',
+    '已达到预估轮数且每个话题满足最小问题数',
+  ];
+}
+
+function initState(framework) {
+  return {
+    currentTopicId: framework.topics[0]?.id || null,
+    topicStage: framework.topics[0]?.stage || 'introduce',
+    topicTurns: 0,
+    totalTurns: 0,
+    interviewEnded: false,
+  };
+}
+
+function getTopic(framework, topicId) {
+  return framework.topics.find(t => t.id === topicId) || framework.topics[0];
+}
+
+function getNextTopicId(framework, currentTopicId) {
+  const idx = framework.topics.findIndex(t => t.id === currentTopicId);
+  if (idx >= 0 && idx < framework.topics.length - 1) return framework.topics[idx + 1].id;
+  return null;
+}
+
+function transcriptText(session) {
+  return session.messages.map(m => `${m.role === 'user' ? '受访者' : '主持人'}：${m.text}`).join('\n\n');
+}
+
+async function decideNext(session, userText, apiKey) {
+  if (session.state.interviewEnded) {
+    return { action: 'end', question: '访谈已经结束，谢谢你的时间。', reason: 'already ended', next_topic_id: null, next_stage: null };
   }
-  if (userText) messages.push({ role: 'user', content: userText });
-  const currentStage = stage || determineStage(session.messages);
-  messages.push({
-    role: 'user',
-    content: `请生成下一个问题。当前应处于阶段：${currentStage}（${STAGES[currentStage].label}）。严格输出 JSON，不要加 markdown 代码块。`,
-  });
+  const fw = session.framework;
+  const state = session.state;
+  const currentTopic = getTopic(fw, state.currentTopicId);
+  const nextTopicId = getNextTopicId(fw, state.currentTopicId);
+  const history = transcriptText(session);
+  const prompt = `你是一位经验丰富的定性研究访谈主持人。当前访谈遵循一个预设框架，请根据对话状态决定下一步动作。\n\n` +
+    `访谈框架：\n${JSON.stringify(fw, null, 2)}\n\n` +
+    `当前状态：\n` +
+    `- 当前话题：${currentTopic.name}（id: ${currentTopic.id}）\n` +
+    `- 话题目标：${currentTopic.goal}\n` +
+    `- 当前阶段：${state.topicStage}\n` +
+    `- 本话题已进行轮数：${state.topicTurns}（建议最少 ${currentTopic.min_questions}，最多 ${currentTopic.max_questions}）\n` +
+    `- 总轮数：${state.totalTurns}（预估 ${fw.estimatedTurns || 12}）\n` +
+    `- 下一话题：${nextTopicId ? getTopic(fw, nextTopicId).name : '无'}\n` +
+    `- 自然结束标准：${fw.endingCriteria?.join('；') || '所有话题探索完毕'}\n\n` +
+    `对话历史：\n${history}\n\n` +
+    `${userText ? `受访者刚说：「${userText}」\n\n` : ''}` +
+    `请决定下一步动作并生成下一个问题。返回 JSON：\n` +
+    `{\n  "action": "ask | probe | transition | end",\n  "question": "要问受访者的下一个简洁问题。如果 action=end，则是感谢收尾语。",\n  "reason": "选择这个动作和问题的理由，结合当前话题、阶段和受访者回答",\n  "next_topic_id": "如果 action=transition，填写下一话题 id；否则省略或为空",\n  "next_stage": "如果 action=transition，填写下一话题进入阶段（introduce/explore/probe/confirm）；否则省略或为空"\n}\n\n` +
+    `动作说明：\n` +
+    `- ask：继续在当前话题当前阶段提一个新问题。\n` +
+    `- probe：对受访者刚说的内容做一次深入追问（动机、例子、感受、原因）。\n` +
+    `- transition：当前话题已探索足够，转移到下一话题。\n` +
+    `- end：所有话题已探索完毕，或受访者明确想结束，或已连续无新信息。\n\n` +
+    `规则：\n` +
+    `- 一次只问一个问题。\n` +
+    `- 问题要自然、对话式，不要像问卷。\n` +
+    `- 如果受访者说「没了」「就这样」「结束」「不知道了」，优先选择 end（如果话题已够）或 transition（如果还有话题）。\n` +
+    `- 如果受访者给出了值得深挖的新信息，优先选择 probe。\n` +
+    `- 如果当前话题已满足 min_questions 且受访者没有新信息，优先 transition。\n` +
+    `- 如果所有话题都完成，必须选择 end。`;
   const raw = await providerChat({
     provider: session.provider,
     baseUrl: session.baseUrl,
     apiKey,
     model: session.model,
-    messages,
+    messages: [
+      { role: 'system', content: '你是一位资深定性研究访谈主持人，擅长动态把握访谈节奏、自然过渡话题、并在合适时机结束访谈。' },
+      { role: 'user', content: prompt },
+    ],
     jsonMode: true,
   });
   try {
-    const parsed = JSON.parse(extractFirstJson(raw));
+    const decision = JSON.parse(extractFirstJson(raw));
     return {
-      question: parsed.question || raw,
-      stage: parsed.stage || currentStage,
-      reason: parsed.reason || '',
-      probe_target: parsed.probe_target || '',
+      action: decision.action || 'ask',
+      question: decision.question || raw,
+      reason: decision.reason || '',
+      next_topic_id: decision.next_topic_id || null,
+      next_stage: decision.next_stage || 'introduce',
     };
   } catch {
-    return { question: raw, stage: currentStage, reason: '', probe_target: '' };
+    return { action: 'ask', question: raw, reason: 'fallback after parse error', next_topic_id: null, next_stage: null };
   }
 }
 
-async function generateFirstQuestion(session, apiKey) {
-  return askQuestion({ session, apiKey, stage: 'opening' });
-}
-
-async function nextQuestion(session, userText, apiKey) {
-  return askQuestion({ session, apiKey, userText });
+function updateState(session, decision) {
+  const state = session.state;
+  const fw = session.framework;
+  if (decision.action === 'end') {
+    state.interviewEnded = true;
+  } else if (decision.action === 'transition') {
+    const nextId = decision.next_topic_id || getNextTopicId(fw, state.currentTopicId);
+    if (nextId) {
+      state.currentTopicId = nextId;
+      state.topicStage = decision.next_stage || getTopic(fw, nextId).stage || 'introduce';
+      state.topicTurns = 0;
+    } else {
+      state.interviewEnded = true;
+    }
+  } else {
+    state.topicTurns++;
+  }
+  state.totalTurns++;
 }
 
 async function generateReport(session, apiKey) {
-  const transcript = session.messages.map(m => `${m.role === 'user' ? '受访者' : '主持人'}：${m.text}`).join('\n\n');
-  let context = `研究目标："${session.goal}"\n`;
-  if (session.targetAudience) context += `目标受众：${session.targetAudience}\n`;
-  if (session.scenarios) context += `研究场景：${session.scenarios}\n`;
-  if (session.persona) context += `受访者画像/上下文：${session.persona}\n`;
-  if (session.methodology && session.methodology !== 'general') context += `采用方法学：${session.methodology}\n`;
-  const prompt = `分析以下访谈记录，输出一份结构化研究报告。\n` +
-    `${context}\n` +
-    `访谈记录：\n${transcript}\n\n` +
+  const ctx = designContext(session);
+  const fw = session.framework;
+  const prompt = `分析以下访谈记录，输出一份结构化研究报告。\n\n` +
+    `${ctx}\n` +
+    `访谈框架：\n${fw.topics.map(t => `- ${t.name}：${t.goal}`).join('\n')}\n\n` +
+    `访谈记录：\n${transcriptText(session)}\n\n` +
     `返回 JSON，格式如下：\n` +
     `{\n  "summary": "string",\n  "themes": [{"name": "string", "description": "string", "quotes": ["string"]}],\n  "insights": [{"finding": "string", "evidence": "string"}],\n  "sentiment": "string",\n  "recommendations": ["string"]\n}`;
   const raw = await providerChat({
@@ -252,26 +308,23 @@ async function generateReport(session, apiKey) {
 }
 
 async function evaluateConversation(session, apiKey) {
-  const transcript = session.messages.map(m => `${m.role === 'user' ? '受访者' : '主持人'}：${m.text}`).join('\n\n');
-  let context = `研究目标："${session.goal}"\n`;
-  if (session.targetAudience) context += `目标受众：${session.targetAudience}\n`;
-  if (session.scenarios) context += `研究场景：${session.scenarios}\n`;
-  if (session.persona) context += `受访者画像/上下文：${session.persona}\n`;
-  if (session.methodology && session.methodology !== 'general') context += `采用方法学：${session.methodology}\n`;
+  const ctx = designContext(session);
   const rubric = `\n` +
     `naturalness（自然度）: 问题是否像真人对话，不生硬。\n` +
-    `relevance（相关性）: 问题是否紧扣研究目标。\n` +
+    `relevance（相关性）: 问题是否紧扣研究目标和当前话题。\n` +
     `probing（追问质量）: 是否基于受访者回答做了有效追问。\n` +
     `single_question（单一问题）: 是否一次只问一个问题。\n` +
     `no_bias（无偏见）: 是否避免引导性或偏见性语言。\n` +
-    `progression（阶段推进）: 访谈是否按阶段有序推进，没有跳阶段或反复。\n` +
+    `progression（节奏推进）: 话题过渡是否自然，是否按框架有序推进。\n` +
+    `ending（自然结束）: 是否在合适时机主动结束，没有反复追问。\n` +
     `persona_fit（画像契合）: 问题是否符合目标受众与受访者画像。`;
   const prompt = `你是一位资深用户研究专家。请评估下面这段 AI 主持的访谈质量。\n\n` +
-    `${context}\n` +
-    `访谈记录：\n${transcript}\n\n` +
+    `${ctx}\n` +
+    `访谈框架：\n${session.framework.topics.map(t => `- ${t.name}：${t.goal}`).join('\n')}\n\n` +
+    `访谈记录：\n${transcriptText(session)}\n\n` +
     `评估维度（1-5 分，5 分最好）：${rubric}\n\n` +
     `返回 JSON：\n` +
-    `{\n  "scores": {"naturalness": 1, "relevance": 1, "probing": 1, "single_question": 1, "no_bias": 1, "progression": 1, "persona_fit": 1},\n  "overall_comment": "总体评价",\n  "top_strength": "最大优点",\n  "top_weakness": "最大改进点",\n  "bad_cases": [{"turn": 1, "issue": "问题"}]\n}`;
+    `{\n  "scores": {"naturalness": 1, "relevance": 1, "probing": 1, "single_question": 1, "no_bias": 1, "progression": 1, "ending": 1, "persona_fit": 1},\n  "overall_comment": "总体评价",\n  "top_strength": "最大优点",\n  "top_weakness": "最大改进点",\n  "bad_cases": [{"turn": 1, "issue": "问题"}]\n}`;
   const raw = await providerChat({
     provider: session.provider,
     baseUrl: session.baseUrl,
@@ -320,12 +373,28 @@ const server = http.createServer(async (req, res) => {
     } catch (e) { return bad(res, e.message); }
   }
 
+  if (pathname === '/api/interview/framework' && req.method === 'POST') {
+    const body = JSON.parse(await readBody(req) || '{}');
+    if (!body.goal?.trim()) return bad(res, 'goal is required');
+    if (!body.provider || !body.apiKey || !body.model) return bad(res, 'provider, apiKey, model are required');
+    const design = {
+      goal: body.goal,
+      targetAudience: body.targetAudience || '',
+      scenarios: body.scenarios || '',
+      persona: body.persona || '',
+      methodology: body.methodology || 'general',
+    };
+    try {
+      const framework = await generateFramework(design, body.apiKey, body.provider, normalizeBaseUrl(body.provider, body.baseUrl), body.model);
+      return json(res, 200, { framework });
+    } catch (e) { return bad(res, e.message); }
+  }
+
   if (pathname === '/api/interview/start' && req.method === 'POST') {
     const body = JSON.parse(await readBody(req) || '{}');
     if (!body.goal?.trim()) return bad(res, 'goal is required');
-    if (!body.provider) return bad(res, 'provider is required');
-    if (!body.apiKey) return bad(res, 'apiKey is required');
-    if (!body.model) return bad(res, 'model is required');
+    if (!body.provider || !body.apiKey || !body.model) return bad(res, 'provider, apiKey, model are required');
+    if (!body.framework || !validateFramework(body.framework)) return bad(res, 'framework is required');
     const id = crypto.randomUUID();
     const session = {
       id,
@@ -337,13 +406,16 @@ const server = http.createServer(async (req, res) => {
       provider: body.provider,
       baseUrl: normalizeBaseUrl(body.provider, body.baseUrl),
       model: body.model,
+      framework: body.framework,
+      state: initState(body.framework),
       createdAt: new Date().toISOString(),
       messages: [],
     };
-    const first = await generateFirstQuestion(session, body.apiKey);
-    session.messages.push({ role: 'assistant', text: first.question, stage: first.stage, reason: first.reason, probe_target: first.probe_target });
+    const first = await decideNext(session, null, body.apiKey);
+    updateState(session, first);
+    session.messages.push({ role: 'assistant', text: first.question, action: first.action, reason: first.reason, topic_id: session.state.currentTopicId, stage: session.state.topicStage, ts: new Date().toISOString() });
     await saveSession(session);
-    return json(res, 201, { id, message: first.question, stage: first.stage, reason: first.reason, probe_target: first.probe_target });
+    return json(res, 201, { id, message: first.question, action: first.action, reason: first.reason, topic_id: session.state.currentTopicId, topic_name: getTopic(session.framework, session.state.currentTopicId).name, stage: session.state.topicStage, interviewEnded: session.state.interviewEnded });
   }
 
   const messageMatch = pathname.match(/^\/api\/interview\/([^/]+)\/message$/);
@@ -354,11 +426,13 @@ const server = http.createServer(async (req, res) => {
     const body = JSON.parse(await readBody(req) || '{}');
     if (!body.text?.trim()) return bad(res, 'text is required');
     if (!body.apiKey) return bad(res, 'apiKey is required');
+    if (session.state.interviewEnded) return json(res, 200, { message: '访谈已经结束。你可以点击生成报告。', interviewEnded: true });
     session.messages.push({ role: 'user', text: body.text, ts: new Date().toISOString() });
-    const reply = await nextQuestion(session, body.text, body.apiKey);
-    session.messages.push({ role: 'assistant', text: reply.question, stage: reply.stage, reason: reply.reason, probe_target: reply.probe_target, ts: new Date().toISOString() });
+    const reply = await decideNext(session, body.text, body.apiKey);
+    updateState(session, reply);
+    session.messages.push({ role: 'assistant', text: reply.question, action: reply.action, reason: reply.reason, topic_id: session.state.currentTopicId, stage: session.state.topicStage, ts: new Date().toISOString() });
     await saveSession(session);
-    return json(res, 200, { message: reply.question, stage: reply.stage, reason: reply.reason, probe_target: reply.probe_target });
+    return json(res, 200, { message: reply.question, action: reply.action, reason: reply.reason, topic_id: session.state.currentTopicId, topic_name: getTopic(session.framework, session.state.currentTopicId).name, stage: session.state.topicStage, interviewEnded: session.state.interviewEnded });
   }
 
   const reportMatch = pathname.match(/^\/api\/interview\/([^/]+)\/report$/);

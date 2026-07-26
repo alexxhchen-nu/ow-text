@@ -1,14 +1,26 @@
 import http from 'http';
 import { spawn } from 'child_process';
 
-const mockQuestion = JSON.stringify({ question: 'mock-question', stage: 'opening', reason: 'mock-reason', probe_target: '' });
+const mockFramework = JSON.stringify({
+  topics: [
+    { id: 't1', name: '开场与背景', goal: '建立信任并了解背景', stage: 'introduce', min_questions: 2, max_questions: 3, focus_prompt: '让对方感到轻松' },
+    { id: 't2', name: '核心探索', goal: '探索核心问题', stage: 'explore', min_questions: 2, max_questions: 4, focus_prompt: '收集事实和痛点' },
+    { id: 't3', name: '深度追问', goal: '挖掘动机', stage: 'probe', min_questions: 1, max_questions: 3, focus_prompt: '追问原因和感受' },
+    { id: 't4', name: '收尾', goal: '确认并感谢', stage: 'confirm', min_questions: 1, max_questions: 2, focus_prompt: '总结确认' },
+  ],
+  endingCriteria: ['all topics explored', 'user says stop'],
+  estimatedTurns: 10,
+});
+
+const mockDecision = JSON.stringify({ action: 'ask', question: 'mock-question', reason: 'mock-reason', next_topic_id: null, next_stage: null });
 const mockEvaluate = JSON.stringify({
-  scores: { naturalness: 4, relevance: 4, probing: 3, single_question: 5, no_bias: 4, progression: 4 },
+  scores: { naturalness: 4, relevance: 4, probing: 3, single_question: 5, no_bias: 4, progression: 4, ending: 4, persona_fit: 4 },
   overall_comment: 'mock overall comment',
   top_strength: 'mock strength',
   top_weakness: 'mock weakness',
   bad_cases: []
 });
+const mockReport = JSON.stringify({ summary: 'mock summary', themes: [], insights: [], sentiment: 'mock', recommendations: [] });
 
 // Mock provider server
 const mockProvider = http.createServer((req, res) => {
@@ -23,8 +35,11 @@ const mockProvider = http.createServer((req, res) => {
     }
     if (req.url === '/v1/chat/completions') {
       res.writeHead(200);
-      let content = mockQuestion;
-      if (body.includes('评估')) content = mockEvaluate;
+      let content = mockDecision;
+      if (body.includes('生成一份结构化访谈框架')) content = mockFramework;
+      else if (body.includes('请决定下一步动作')) content = mockDecision;
+      else if (body.includes('评估下面这段')) content = mockEvaluate;
+      else if (body.includes('结构化研究报告')) content = mockReport;
       res.end(JSON.stringify({ choices: [{ message: { content } }] }) + 'data: [DONE]');
       return;
     }
@@ -44,39 +59,40 @@ mockProvider.listen(3001, async () => {
 
   const base = 'http://localhost:3002';
   const cfg = { provider: 'openai', baseUrl: 'http://localhost:3001/v1', apiKey: 'fake-key', model: 'mock-model' };
+  const design = { goal: 'test goal', targetAudience: 'test audience', scenarios: 'test scenario', persona: 'test persona', methodology: 'JTBD' };
 
   try {
     // List models
     const modelsRes = await fetch(`${base}/api/models`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cfg) });
     const models = await modelsRes.json();
-    console.assert(models.models[0].id === 'mock-model', 'models list failed');
+    if (models.models[0].id !== 'mock-model') throw new Error('models list failed');
 
-    // Start interview
-    const startRes = await fetch(`${base}/api/interview/start`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...cfg, goal: 'test goal', targetAudience: 'test audience', scenarios: 'test scenario', persona: 'test persona', methodology: 'JTBD' }) });
+    // Generate framework
+    const fwRes = await fetch(`${base}/api/interview/framework`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...cfg, ...design }) });
+    const fw = await fwRes.json();
+    if (!fw.framework.topics.length) throw new Error('framework generation failed');
+
+    // Start interview with framework
+    const startRes = await fetch(`${base}/api/interview/start`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...cfg, ...design, framework: fw.framework }) });
     const start = await startRes.json();
-    console.assert(start.message === 'mock-question', 'start question failed');
-    console.assert(start.stage === 'opening', 'start stage failed');
-
-    // Verify session stored design fields
-    const sessionRes = await fetch(`${base}/api/interview/${start.id}`);
-    const session = await sessionRes.json();
-    console.assert(session.targetAudience === 'test audience', 'targetAudience not stored');
-    console.assert(session.methodology === 'JTBD', 'methodology not stored');
+    if (start.message !== 'mock-question') throw new Error('start question failed: ' + start.message);
+    if (start.action !== 'ask') throw new Error('start action failed');
+    if (start.topic_id !== 't1') throw new Error('start topic_id failed');
 
     // Send message
     const msgRes = await fetch(`${base}/api/interview/${start.id}/message`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: 'hello', apiKey: cfg.apiKey }) });
     const msg = await msgRes.json();
-    console.assert(msg.message === 'mock-question', 'message reply failed');
+    if (msg.message !== 'mock-question') throw new Error('message reply failed: ' + msg.message);
 
     // Generate report
     const reportRes = await fetch(`${base}/api/interview/${start.id}/report`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ apiKey: cfg.apiKey }) });
     const report = await reportRes.json();
-    console.assert(report.goal === 'test goal', 'report goal failed');
+    if (report.goal !== 'test goal') throw new Error('report goal failed');
 
     // Evaluate conversation
     const evalRes = await fetch(`${base}/api/interview/${start.id}/evaluate`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ apiKey: cfg.apiKey }) });
     const evaluation = await evalRes.json();
-    console.assert(evaluation.evaluation.overall_comment === 'mock overall comment', 'evaluate failed');
+    if (evaluation.evaluation.overall_comment !== 'mock overall comment') throw new Error('evaluate failed: ' + JSON.stringify(evaluation));
 
     console.log('All checks passed');
   } catch (e) {
