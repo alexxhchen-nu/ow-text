@@ -8,9 +8,12 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = path.join(__dirname, 'data');
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const PORT = process.env.PORT || 3000;
-const OPENAI_KEY = process.env.OPENAI_API_KEY;
 
-const MODEL = 'gpt-4o-mini';
+const DEFAULT_BASE_URLS = {
+  openai: 'https://api.openai.com/v1',
+  anthropic: 'https://api.anthropic.com/v1',
+  custom: '',
+};
 
 async function ensureDataDir() {
   try { await fs.mkdir(DATA_DIR, { recursive: true }); } catch {}
@@ -27,61 +30,114 @@ async function saveSession(session) {
   await fs.writeFile(path.join(DATA_DIR, `${session.id}.json`), JSON.stringify(session, null, 2));
 }
 
-async function openaiChat({ messages, jsonMode = false }) {
-  const body = { model: MODEL, messages };
+function normalizeBaseUrl(provider, baseUrl) {
+  if (baseUrl) return baseUrl.replace(/\/$/, '');
+  return DEFAULT_BASE_URLS[provider] || '';
+}
+
+async function listModels({ provider, baseUrl, apiKey }) {
+  if (!apiKey) throw new Error('API key is required');
+  const url = `${normalizeBaseUrl(provider, baseUrl)}/models`;
+  const headers = { 'Content-Type': 'application/json' };
+  if (provider === 'anthropic') {
+    headers['x-api-key'] = apiKey;
+    headers['anthropic-version'] = '2023-06-01';
+  } else {
+    headers['Authorization'] = `Bearer ${apiKey}`;
+  }
+  const res = await fetch(url, { headers });
+  if (!res.ok) throw new Error(`Models endpoint ${res.status}: ${await res.text()}`);
+  const data = await res.json();
+  const items = data.data || data.models || [];
+  return items.map(m => ({ id: m.id, name: m.id })).sort((a, b) => a.id.localeCompare(b.id));
+}
+
+function splitSystem(messages) {
+  let system = '';
+  const chat = [];
+  for (const m of messages) {
+    if (m.role === 'system') system += (system ? '\n' : '') + m.content;
+    else chat.push(m);
+  }
+  return { system, chat };
+}
+
+async function providerChat({ provider, baseUrl, apiKey, model, messages, jsonMode = false }) {
+  if (!apiKey) throw new Error('API key is required');
+  if (!model) throw new Error('model is required');
+  const base = normalizeBaseUrl(provider, baseUrl);
+  if (provider === 'anthropic') {
+    const { system, chat } = splitSystem(messages);
+    const body = { model, messages: chat, max_tokens: 4096, system: system + (jsonMode ? '\nRespond only with valid JSON.' : '') };
+    const res = await fetch(`${base}/messages`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) throw new Error(`Anthropic ${res.status}: ${await res.text()}`);
+    const data = await res.json();
+    return data.content?.[0]?.text ?? '';
+  }
+  // OpenAI / OpenAI-compatible
+  const body = { model, messages };
   if (jsonMode) body.response_format = { type: 'json_object' };
-  const res = await fetch('https://api.openai.com/v1/chat/completions', {
+  const res = await fetch(`${base}/chat/completions`, {
     method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${OPENAI_KEY}`,
-      'Content-Type': 'application/json',
-    },
+    headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
-  if (!res.ok) throw new Error(`OpenAI ${res.status}: ${await res.text()}`);
+  if (!res.ok) throw new Error(`Provider ${res.status}: ${await res.text()}`);
   const data = await res.json();
-  return data.choices[0].message.content;
+  return data.choices?.[0]?.message?.content ?? '';
 }
 
 function interviewerSystem(goal) {
-  return `You are an expert qualitative interviewer conducting a user research interview.\n` +
-    `Research goal: "${goal}"\n\n` +
-    `Rules:\n` +
-    `- Ask one concise question at a time.\n` +
-    `- Listen to the answer, then probe deeper with a natural follow-up about motivations, feelings, or specific examples.\n` +
-    `- Keep the tone conversational and respectful.\n` +
-    `- After about 5-8 exchanges, or when the goal is satisfied, wrap up by saying the interview is complete and thanking the participant.\n` +
-    `- Do not give analysis, summaries, or lists during the interview. Just the next question.`;
+  return `你是一位经验丰富的定性研究访谈主持人。\n` +
+    `研究目标："${goal}"\n\n` +
+    `规则：\n` +
+    `- 一次只问一个简洁的问题。\n` +
+    `- 听完回答后，用自然的方式追问动机、感受或具体例子。\n` +
+    `- 语气对话式、尊重受访者。\n` +
+    `- 大约 5-8 轮后，或目标已满足时，结束访谈并感谢受访者。\n` +
+    `- 访谈过程中不要给出分析、总结或列表，只给出下一个问题。`;
 }
 
-async function generateFirstQuestion(goal) {
-  return openaiChat({
+async function generateFirstQuestion(session, apiKey) {
+  return providerChat({
+    provider: session.provider,
+    baseUrl: session.baseUrl,
+    apiKey,
+    model: session.model,
     messages: [
-      { role: 'system', content: interviewerSystem(goal) },
-      { role: 'user', content: 'Generate a warm, open-ended first question to begin the interview.' },
+      { role: 'system', content: interviewerSystem(session.goal) },
+      { role: 'user', content: '生成一个温暖、开放式的问题来开始访谈。' },
     ],
   });
 }
 
-async function nextQuestion(session, userText) {
+async function nextQuestion(session, userText, apiKey) {
   const messages = [{ role: 'system', content: interviewerSystem(session.goal) }];
   for (const m of session.messages) {
     messages.push({ role: m.role === 'user' ? 'user' : 'assistant', content: m.text });
   }
   messages.push({ role: 'user', content: userText });
-  return openaiChat({ messages });
+  return providerChat({ provider: session.provider, baseUrl: session.baseUrl, apiKey, model: session.model, messages });
 }
 
-async function generateReport(session) {
-  const transcript = session.messages.map(m => `${m.role === 'user' ? 'Participant' : 'Interviewer'}: ${m.text}`).join('\n\n');
-  const prompt = `Analyze the following interview transcript and produce a structured research report.\n` +
-    `Research goal: "${session.goal}"\n\n` +
-    `Transcript:\n${transcript}\n\n` +
-    `Return JSON with this exact shape:\n` +
+async function generateReport(session, apiKey) {
+  const transcript = session.messages.map(m => `${m.role === 'user' ? '受访者' : '主持人'}：${m.text}`).join('\n\n');
+  const prompt = `分析以下访谈记录，输出一份结构化研究报告。\n` +
+    `研究目标："${session.goal}"\n\n` +
+    `访谈记录：\n${transcript}\n\n` +
+    `返回 JSON，格式如下：\n` +
     `{\n  "summary": "string",\n  "themes": [{"name": "string", "description": "string", "quotes": ["string"]}],\n  "insights": [{"finding": "string", "evidence": "string"}],\n  "sentiment": "string",\n  "recommendations": ["string"]\n}`;
-  const raw = await openaiChat({
+  const raw = await providerChat({
+    provider: session.provider,
+    baseUrl: session.baseUrl,
+    apiKey,
+    model: session.model,
     messages: [
-      { role: 'system', content: 'You are a senior UX researcher who writes concise, evidence-based reports.' },
+      { role: 'system', content: '你是一位资深用户研究专家，擅长撰写简洁、有证据支撑的研究报告。' },
       { role: 'user', content: prompt },
     ],
     jsonMode: true,
@@ -115,39 +171,59 @@ const server = http.createServer(async (req, res) => {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
 
+  if (pathname === '/api/models' && req.method === 'POST') {
+    const body = JSON.parse(await readBody(req) || '{}');
+    try {
+      const models = await listModels({ provider: body.provider, baseUrl: body.baseUrl, apiKey: body.apiKey });
+      return json(res, 200, { models });
+    } catch (e) { return bad(res, e.message); }
+  }
+
   if (pathname === '/api/interview/start' && req.method === 'POST') {
-    if (!OPENAI_KEY) return bad(res, 'OPENAI_API_KEY not set');
     const body = JSON.parse(await readBody(req) || '{}');
     if (!body.goal?.trim()) return bad(res, 'goal is required');
+    if (!body.provider) return bad(res, 'provider is required');
+    if (!body.apiKey) return bad(res, 'apiKey is required');
+    if (!body.model) return bad(res, 'model is required');
     const id = crypto.randomUUID();
-    const firstQuestion = await generateFirstQuestion(body.goal);
-    const session = { id, goal: body.goal, createdAt: new Date().toISOString(), messages: [{ role: 'assistant', text: firstQuestion }] };
+    const session = {
+      id,
+      goal: body.goal,
+      provider: body.provider,
+      baseUrl: normalizeBaseUrl(body.provider, body.baseUrl),
+      model: body.model,
+      createdAt: new Date().toISOString(),
+      messages: [],
+    };
+    const firstQuestion = await generateFirstQuestion(session, body.apiKey);
+    session.messages.push({ role: 'assistant', text: firstQuestion });
     await saveSession(session);
     return json(res, 201, { id, message: firstQuestion });
   }
 
   const messageMatch = pathname.match(/^\/api\/interview\/([^/]+)\/message$/);
   if (messageMatch && req.method === 'POST') {
-    if (!OPENAI_KEY) return bad(res, 'OPENAI_API_KEY not set');
     const id = messageMatch[1];
     const session = await loadSession(id);
     if (!session) return json(res, 404, { error: 'session not found' });
     const body = JSON.parse(await readBody(req) || '{}');
     if (!body.text?.trim()) return bad(res, 'text is required');
+    if (!body.apiKey) return bad(res, 'apiKey is required');
     session.messages.push({ role: 'user', text: body.text, ts: new Date().toISOString() });
-    const reply = await nextQuestion(session, body.text);
+    const reply = await nextQuestion(session, body.text, body.apiKey);
     session.messages.push({ role: 'assistant', text: reply, ts: new Date().toISOString() });
     await saveSession(session);
     return json(res, 200, { message: reply });
   }
 
   const reportMatch = pathname.match(/^\/api\/interview\/([^/]+)\/report$/);
-  if (reportMatch && req.method === 'GET') {
-    if (!OPENAI_KEY) return bad(res, 'OPENAI_API_KEY not set');
+  if (reportMatch && req.method === 'POST') {
     const id = reportMatch[1];
     const session = await loadSession(id);
     if (!session) return json(res, 404, { error: 'session not found' });
-    const report = await generateReport(session);
+    const body = JSON.parse(await readBody(req) || '{}');
+    if (!body.apiKey) return bad(res, 'apiKey is required');
+    const report = await generateReport(session, body.apiKey);
     return json(res, 200, { id, goal: session.goal, report });
   }
 
@@ -172,7 +248,4 @@ const server = http.createServer(async (req, res) => {
 });
 
 await ensureDataDir();
-server.listen(PORT, () => {
-  console.log(`Interview server running at http://localhost:${PORT}`);
-  if (!OPENAI_KEY) console.warn('Warning: OPENAI_API_KEY is not set. API calls will fail.');
-});
+server.listen(PORT, () => console.log(`Interview server running at http://localhost:${PORT}`));

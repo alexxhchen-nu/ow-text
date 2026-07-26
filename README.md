@@ -1,42 +1,47 @@
 # ow-text
 
-Text version of the OW Chatbot Tool — a minimal AI-moderated interview platform.
+Text version of the OW Chatbot Tool — 一个最小可用的 AI 主持用户访谈平台。
 
-## What it does
+## 功能
 
-1. Enter a research goal (e.g. “Understand why users churn during onboarding”).
-2. An AI interviewer asks open-ended questions and probes answers.
-3. Transcripts are saved locally as JSON.
-4. One click generates a structured insight report with themes, quotes, insights, and recommendations.
+1. 在界面配置模型提供商、API Key 和模型。
+2. 输入研究目标。
+3. AI 逐题访谈并自动追问深挖。
+4. 结束访谈后一键生成结构化洞察报告（摘要、主题、原话引用、洞察、情绪、建议）。
 
-## Run locally
+## 本地运行
 
 ```bash
-# 1. Set your OpenAI API key
-export OPENAI_API_KEY=sk-...
-
-# 2. Start the server
+npm install   # 无需依赖，仅安装空 package.json 也可跳过
 node server.js
-
-# 3. Open http://localhost:3000
+# 打开 http://localhost:3000
 ```
 
-No dependencies are required; it uses Node’s built-in HTTP module and native `fetch`.
+然后在页面里选择：
+- 提供商：OpenAI / Anthropic / 自定义 OpenAI 兼容端点
+- API Key（仅在请求中使用，不保存到服务器）
+- 点击“获取模型”列出可用模型并选择
+- 输入研究目标，开始访谈
+
+## 支持的提供商
+
+- **OpenAI**：默认 `https://api.openai.com/v1`，使用 `/chat/completions`。
+- **Anthropic**：默认 `https://api.anthropic.com/v1`，使用 `/messages`。
+- **自定义 OpenAI 兼容端点**：例如 Ollama、OpenRouter、Groq 等，需填写自定义 API 地址。
 
 ## API
 
-- `POST /api/interview/start` — body `{ goal }` → starts a session and returns the first question.
-- `POST /api/interview/:id/message` — body `{ text }` → continues the interview.
-- `GET /api/interview/:id/report` — generates the insight report.
-- `GET /api/interview/:id` — fetches the raw session.
+- `POST /api/models` — body `{ provider, baseUrl?, apiKey }` → 列出可用模型。
+- `POST /api/interview/start` — body `{ provider, baseUrl?, apiKey, model, goal }` → 开始访谈并返回首问。
+- `POST /api/interview/:id/message` — body `{ text, apiKey }` → 继续访谈。
+- `POST /api/interview/:id/report` — body `{ apiKey }` → 生成洞察报告。
+- `GET /api/interview/:id` → 获取原始会话。
 
-Sessions are stored in `data/` as JSON files.
+会话以 JSON 文件保存在 `data/` 目录。
 
-## What’s missing (for later)
+## 后续可扩展
 
-- Authentication, multi-user accounts, and cloud deployment.
-- Panel/recruitment links and demographic quotas.
-- Real-time collaboration and commenting.
-- Audio/voice input and output.
-- Persistent database (currently local filesystem).
-
+- 云端部署与持久化数据库。
+- 受访者招募链接与配额控制。
+- 多人协作与评论。
+- 语音输入/输出。

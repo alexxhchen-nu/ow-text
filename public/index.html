@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>OW Text Interview</title>
+  <title>OW Text 访谈</title>
   <style>
     :root { --bg: #f6f6f8; --card: #fff; --text: #1a1a1a; --muted: #6b7280; --accent: #2563eb; --accent-light: #eff6ff; --border: #e5e7eb; }
     @media (prefers-color-scheme: dark) { :root { --bg: #0f172a; --card: #1e293b; --text: #f8fafc; --muted: #94a3b8; --accent: #60a5fa; --accent-light: #1e3a8a; --border: #334155; } }
@@ -14,12 +14,15 @@
     h1 { margin: 0 0 8px; font-size: 1.5rem; }
     .subtitle { color: var(--muted); margin: 0 0 24px; }
     label { display: block; font-weight: 500; margin-bottom: 6px; }
-    textarea, input[type="text"] { width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text); font: inherit; }
+    textarea, input[type="text"], select { width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text); font: inherit; }
     textarea { min-height: 90px; resize: vertical; }
+    select { cursor: pointer; }
     .btn { display: inline-flex; align-items: center; gap: 6px; padding: 10px 18px; border: 0; border-radius: 8px; background: var(--accent); color: white; font: inherit; font-weight: 500; cursor: pointer; }
     .btn:disabled { opacity: 0.6; cursor: not-allowed; }
     .btn.secondary { background: transparent; color: var(--text); border: 1px solid var(--border); }
     .row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+    .row > * { flex: 1; }
+    .row > .btn { flex: 0 0 auto; }
     .chat { display: flex; flex-direction: column; gap: 12px; max-height: 60vh; overflow-y: auto; padding: 8px 0; }
     .msg { padding: 12px 16px; border-radius: 12px; max-width: 85%; white-space: pre-wrap; }
     .msg.user { align-self: flex-end; background: var(--accent); color: white; }
@@ -35,39 +38,68 @@
     .report ul { padding-left: 20px; }
     .quote { font-style: italic; color: var(--muted); border-left: 3px solid var(--accent); padding-left: 12px; margin: 8px 0; }
     .error { color: #dc2626; background: #fef2f2; padding: 12px; border-radius: 8px; margin-bottom: 12px; }
+    .hint { color: var(--muted); font-size: 0.85rem; margin-top: 4px; }
+    .model-row { display: flex; gap: 10px; align-items: flex-start; }
+    .model-row select { flex: 1; }
   </style>
 </head>
 <body>
   <div class="container">
     <div id="setup" class="card">
-      <h1>OW Text Interview</h1>
-      <p class="subtitle">AI-moderated user interviews that turn conversation into insight reports.</p>
-      <label for="goal">What do you want to learn?</label>
-      <textarea id="goal" placeholder="e.g. Understand why users churn during onboarding"></textarea>
+      <h1>OW Text 访谈</h1>
+      <p class="subtitle">AI 主持的用户访谈，自动产出洞察报告。</p>
+
+      <label for="provider">模型提供商</label>
+      <select id="provider">
+        <option value="openai">OpenAI / OpenAI 兼容</option>
+        <option value="anthropic">Anthropic</option>
+        <option value="custom">自定义 OpenAI 兼容端点</option>
+      </select>
+      <p class="hint">Anthropic 将自动使用 /messages，其余兼容端点使用 /chat/completions。</p>
+
+      <label for="baseUrl" style="margin-top:12px">API 地址（可选）</label>
+      <input type="text" id="baseUrl" placeholder="留空使用默认地址" />
+
+      <label for="apiKey" style="margin-top:12px">API Key</label>
+      <input type="text" id="apiKey" placeholder="sk-... 或 anthropic 的 key" />
+      <p class="hint">仅在请求中临时使用，不会保存到服务器。</p>
+
+      <div class="model-row" style="margin-top:12px">
+        <div style="flex:1">
+          <label for="model">模型</label>
+          <select id="model" disabled><option value="">先点击“获取模型”</option></select>
+        </div>
+        <button id="fetchModelsBtn" class="btn" style="margin-top:23px">获取模型</button>
+      </div>
+      <div id="modelsError" class="error hidden"></div>
+
+      <label for="goal" style="margin-top:16px">研究目标</label>
+      <textarea id="goal" placeholder="例如：了解用户为什么在新手引导阶段流失"></textarea>
+
       <div class="row" style="margin-top:16px">
-        <button id="startBtn" class="btn">Start Interview</button>
+        <button id="startBtn" class="btn" disabled>开始访谈</button>
       </div>
       <div id="setupError" class="error hidden"></div>
     </div>
 
     <div id="chat" class="card hidden">
       <div class="row" style="justify-content:space-between; margin-bottom:12px">
-        <h1 style="font-size:1.25rem">Interview</h1>
-        <button id="endBtn" class="btn secondary">End & Report</button>
+        <h1 style="font-size:1.25rem">访谈</h1>
+        <button id="endBtn" class="btn secondary">结束并生成报告</button>
       </div>
       <div id="messages" class="chat"></div>
-      <div id="typing" class="hidden" style="color:var(--muted); padding:8px 0">Interviewer is typing…</div>
+      <div id="typing" class="hidden" style="color:var(--muted); padding:8px 0">主持人正在输入…</div>
       <div class="input-area">
-        <textarea id="answer" placeholder="Type your answer…"></textarea>
-        <button id="sendBtn" class="btn">Send</button>
+        <textarea id="answer" placeholder="输入你的回答…"></textarea>
+        <button id="sendBtn" class="btn">发送</button>
       </div>
       <div id="chatError" class="error hidden"></div>
     </div>
 
     <div id="report" class="card hidden report">
       <div class="row" style="justify-content:space-between; margin-bottom:16px">
-        <h1>Insight Report</h1>
-        <button id="newBtn" class="btn secondary">New Interview</button>
+        <h1>洞察报告</h1>
+        <button id="newBtn" class="btn secondary">新建访谈</button>
       </div>
       <div id="reportContent"></div>
     </div>
@@ -76,6 +108,7 @@
   <script>
     const $ = (id) => document.getElementById(id);
     let sessionId = null;
+    let currentConfig = {};
 
     async function api(url, opts = {}) {
       const res = await fetch(url, { headers: { 'Content-Type': 'application/json' }, ...opts });
@@ -95,13 +128,45 @@
       $('messages').scrollTop = $('messages').scrollHeight;
     }
 
+    function getConfig() {
+      return {
+        provider: $('provider').value,
+        baseUrl: $('baseUrl').value.trim(),
+        apiKey: $('apiKey').value.trim(),
+        model: $('model').value,
+      };
+    }
+
+    $('fetchModelsBtn').onclick = async () => {
+      const cfg = getConfig();
+      if (!cfg.apiKey) return $('modelsError').textContent = '请先填写 API Key。';
+      $('fetchModelsBtn').disabled = true;
+      hide($('modelsError'));
+      $('model').innerHTML = '<option value="">加载中…</option>';
+      $('model').disabled = true;
+      try {
+        const { models } = await api('/api/models', { method: 'POST', body: JSON.stringify(cfg) });
+        if (!models.length) throw new Error('未获取到可用模型');
+        $('model').innerHTML = models.map(m => `<option value="${escapeHtml(m.id)}">${escapeHtml(m.id)}</option>`).join('');
+        $('model').disabled = false;
+        $('startBtn').disabled = false;
+      } catch (e) {
+        $('modelsError').textContent = e.message;
+        show($('modelsError'));
+        $('model').innerHTML = '<option value="">获取失败</option>';
+      } finally { $('fetchModelsBtn').disabled = false; }
+    };
+
     $('startBtn').onclick = async () => {
       const goal = $('goal').value.trim();
-      if (!goal) return $('setupError').textContent = 'Enter a research goal.';
+      if (!goal) return $('setupError').textContent = '请输入研究目标。';
+      currentConfig = getConfig();
+      if (!currentConfig.apiKey) return $('setupError').textContent = '请填写 API Key。';
+      if (!currentConfig.model) return $('setupError').textContent = '请先获取并选择模型。';
       $('setupError').textContent = '';
       $('startBtn').disabled = true;
       try {
-        const { id, message } = await api('/api/interview/start', { method: 'POST', body: JSON.stringify({ goal }) });
+        const { id, message } = await api('/api/interview/start', { method: 'POST', body: JSON.stringify({ ...currentConfig, goal }) });
         sessionId = id;
         hide($('setup'));
         show($('chat'));
@@ -120,7 +185,7 @@
       $('sendBtn').disabled = true;
       show($('typing'));
       try {
-        const { message } = await api(`/api/interview/${sessionId}/message`, { method: 'POST', body: JSON.stringify({ text }) });
+        const { message } = await api(`/api/interview/${sessionId}/message`, { method: 'POST', body: JSON.stringify({ text, apiKey: currentConfig.apiKey }) });
         appendMessage('assistant', message);
       } catch (e) {
         $('chatError').textContent = e.message;
@@ -134,7 +199,7 @@
     $('endBtn').onclick = async () => {
       $('endBtn').disabled = true;
       try {
-        const data = await api(`/api/interview/${sessionId}/report`);
+        const data = await api(`/api/interview/${sessionId}/report`, { method: 'POST', body: JSON.stringify({ apiKey: currentConfig.apiKey }) });
         renderReport(data);
         hide($('chat'));
         show($('report'));
@@ -149,17 +214,17 @@
     function renderReport({ goal, report }) {
       const r = report;
       const html = [
-        `<section><h3>Goal</h3><p>${escapeHtml(goal)}</p></section>`,
-        `<section><h3>Summary</h3><p>${escapeHtml(r.summary)}</p></section>`,
-        `<section><h3>Sentiment</h3><p>${escapeHtml(r.sentiment)}</p></section>`,
-        r.themes?.length ? `<section><h3>Themes</h3>` + r.themes.map(t =>
+        `<section><h3>研究目标</h3><p>${escapeHtml(goal)}</p></section>`,
+        `<section><h3>摘要</h3><p>${escapeHtml(r.summary)}</p></section>`,
+        `<section><h3>情绪</h3><p>${escapeHtml(r.sentiment)}</p></section>`,
+        r.themes?.length ? `<section><h3>主题</h3>` + r.themes.map(t =>
           `<div><strong>${escapeHtml(t.name)}</strong><p>${escapeHtml(t.description)}</p>` +
           (t.quotes?.length ? t.quotes.map(q => `<div class="quote">"${escapeHtml(q)}"</div>`).join('') : '') + `</div>`
         ).join('') + `</section>` : '',
-        r.insights?.length ? `<section><h3>Insights</h3><ul>` + r.insights.map(i =>
+        r.insights?.length ? `<section><h3>洞察</h3><ul>` + r.insights.map(i =>
           `<li><strong>${escapeHtml(i.finding)}</strong> <span style="color:var(--muted)">— ${escapeHtml(i.evidence)}</span></li>`
         ).join('') + `</ul></section>` : '',
-        r.recommendations?.length ? `<section><h3>Recommendations</h3><ul>` + r.recommendations.map(x => `<li>${escapeHtml(x)}</li>`).join('') + `</ul></section>` : ''
+        r.recommendations?.length ? `<section><h3>建议</h3><ul>` + r.recommendations.map(x => `<li>${escapeHtml(x)}</li>`).join('') + `</ul></section>` : ''
       ].join('');
       $('reportContent').innerHTML = html;
     }
