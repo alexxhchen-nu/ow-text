@@ -33,6 +33,12 @@
     .bar-track { height: 8px; overflow: hidden; border-radius: 999px; background: #ece7e1; }
     .progress { margin-top: 14px; padding: 14px; background: #f8f7f5; border: 1px solid #e8e2dc; border-radius: 14px; color: var(--muted); }
     .progress-bar { height: 7px; background: #ece7e1; border-radius: 999px; overflow: hidden; }
+    .mini-grid { display:grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin: 12px 0; }
+    .tiny { font-size: 0.9rem; color: var(--muted); }
+    table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 0.92rem; }
+    th, td { text-align: left; padding: 10px; border-top: 1px solid #ece7e1; vertical-align: top; }
+    summary { list-style: none; }
+    summary::-webkit-details-marker { display: none; }
   </style>
 </head>
 <body>
@@ -133,6 +139,9 @@
         <textarea id="answer" placeholder="输入你的回答…"></textarea>
         <button id="sendBtn" class="btn">发送</button>
       </div>
+      <div class="row" style="margin-top:10px">
+        <button id="nextQuestionBtn" class="btn secondary hidden">下一个问题</button>
+      </div>
       <div id="chatError" class="error hidden"></div>
     </div>
 
@@ -140,11 +149,16 @@
       <div class="row" style="justify-content:space-between; margin-bottom:16px">
         <h1>洞察报告</h1>
         <div class="row" style="flex:0 0 auto">
+          <button id="downloadCsvBtn" class="btn secondary">下载 CSV</button>
           <button id="evalBtn" class="btn secondary">评估访谈</button>
           <button id="newBtn" class="btn secondary">新建访谈</button>
         </div>
       </div>
       <div id="evalContent"></div>
+      <details id="transcriptDetails" class="insight-card" style="margin-top:16px">
+        <summary style="cursor:pointer;font-weight:600">查看访谈内容</summary>
+        <div id="transcriptTable"></div>
+      </details>
       <div id="reportContent"></div>
     </div>
   </div>
@@ -155,6 +169,7 @@
     let currentConfig = {};
     let currentDesign = {};
     let currentFramework = null;
+    let transcriptRows = [];
 
     async function api(url, opts = {}) {
       const res = await fetch(url, { headers: { 'Content-Type': 'application/json' }, ...opts });
@@ -202,6 +217,7 @@
       div.innerHTML = html;
       $('messages').appendChild(div);
       $('messages').scrollTop = $('messages').scrollHeight;
+      transcriptRows.push({ role, text, meta, ts: new Date().toISOString() });
     }
 
     function getConfig() {
@@ -370,8 +386,10 @@
         sessionId = id;
         hide($('framework'));
         show($('chat'));
+        show($('nextQuestionBtn'));
+        show($('downloadCsvBtn'));
         appendMessage('assistant', message, { topic_name, stage, action, reason });
-        if (interviewEnded) show($('endedNotice'));
+        if (interviewEnded) { show($('endedNotice')); hide($('nextQuestionBtn')); }
       } catch (e) {
         $('frameworkError').textContent = e.message;
         show($('frameworkError'));
@@ -388,7 +406,7 @@
       try {
         const { message, topic_name, stage, action, reason, interviewEnded } = await api(`/api/interview/${sessionId}/message`, { method: 'POST', body: JSON.stringify({ text, apiKey: currentConfig.apiKey }) });
         appendMessage('assistant', message, { topic_name, stage, action, reason });
-        if (interviewEnded) show($('endedNotice'));
+        if (interviewEnded) { show($('endedNotice')); hide($('nextQuestionBtn')); }
       } catch (e) {
         $('chatError').textContent = e.message;
         show($('chatError'));
@@ -396,6 +414,8 @@
     }
 
     $('sendBtn').onclick = send;
+    $('nextQuestionBtn').onclick = async () => { $('answer').value = '继续'; await send(); };
+    $('downloadCsvBtn').onclick = downloadCsv;
     $('answer').addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } });
 
     $('endBtn').onclick = async () => {
@@ -404,6 +424,7 @@
         const data = await api(`/api/interview/${sessionId}/report`, { method: 'POST', body: JSON.stringify({ apiKey: currentConfig.apiKey }) });
         renderReport(data);
         hide($('chat'));
+        renderTranscriptTable();
         show($('report'));
       } catch (e) {
         $('chatError').textContent = e.message;
@@ -487,13 +508,9 @@
         `<div class="insight-card"><div class="eyebrow">一句话摘要</div><p class="quick-summary">${escapeHtml(r.summary || '暂无摘要')}</p></div>`,
         keywords.length ? `<div class="pill-row">${keywords.map(k => `<span class="pill">${escapeHtml(k)}</span>`).join('')}</div>` : '',
         r.sentiment ? `<div class="insight-card"><div class="eyebrow">情绪 / 动机线索</div><strong>${escapeHtml(r.sentiment)}</strong></div>` : '',
-        r.themes?.length ? '<h3>主题地图</h3><div class="insight-list">' + r.themes.map(t =>
-          `<div class="insight-card"><strong>${escapeHtml(t.name)}</strong><p>${escapeHtml(t.description)}</p>${t.quotes?.length ? t.quotes.map(q => `<div class="quote">"${escapeHtml(q)}"</div>`).join('') : ''}</div>`
-        ).join('') + '</div>' : '',
-        r.insights?.length ? '<h3>关键洞察</h3><div class="insight-list">' + r.insights.map(i =>
-          `<div class="insight-card"><strong>${escapeHtml(i.finding)}</strong><p>${escapeHtml(i.evidence)}</p></div>`
-        ).join('') + '</div>' : '',
-        r.recommendations?.length ? '<h3>下一步建议</h3><div class="insight-list">' + r.recommendations.map(x => `<div class="insight-card">${escapeHtml(x)}</div>`).join('') + '</div>' : '',
+        r.themes?.length ? '<h3>主题地图</h3><div class="insight-grid">' + r.themes.map(t => { const quote = t.quotes?.[0] ? `<div class="tiny">${escapeHtml(t.quotes[0])}</div>` : ''; return `<div class="insight-card"><strong>${escapeHtml(t.name)}</strong><div class="tiny">${escapeHtml(t.description)}</div>${quote}</div>`; }).join('') + '</div>' : '',
+        r.insights?.length ? '<h3>关键洞察</h3><div class="insight-list">' + r.insights.map(i => `<div class="insight-card"><strong>${escapeHtml(i.finding)}</strong><div class="tiny">${escapeHtml(i.evidence)}</div></div>`).join('') + '</div>' : '',
+        r.recommendations?.length ? '<h3>下一步建议</h3><div class="mini-grid">' + r.recommendations.slice(0,4).map(x => `<div class="insight-card">${escapeHtml(x)}</div>`).join('') + '</div>' : '',
         '</section>'
       ].join('');
       $('reportContent').innerHTML = html;
@@ -506,6 +523,27 @@
         .filter(x => !stop.has(x.toLowerCase()))
         .filter((x, i, a) => a.indexOf(x) === i)
         .slice(0, 10);
+    }
+
+
+    function renderTranscriptTable() {
+      $('transcriptTable').innerHTML = `
+        <table>
+          <thead><tr><th>角色</th><th>内容</th><th>话题</th><th>阶段</th></tr></thead>
+          <tbody>${transcriptRows.map(r => `<tr><td>${escapeHtml(r.role === 'assistant' ? '主持人' : '受访者')}</td><td>${escapeHtml(r.text)}</td><td>${escapeHtml(r.meta?.topic_name || '')}</td><td>${escapeHtml(r.meta?.stage || '')}</td></tr>`).join('')}</tbody>
+        </table>
+      `;
+    }
+
+    function downloadCsv() {
+      const rows = [['role','text','topic','stage','time']].concat(transcriptRows.map(r => [r.role, r.text, r.meta?.topic_name || '', r.meta?.stage || '', r.ts || '']));
+      const csv = rows.map(cols => cols.map(v => `"${String(v).replaceAll('"', '""')}"`).join(',')).join('\n');
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'interview-transcript.csv';
+      a.click();
+      URL.revokeObjectURL(a.href);
     }
 
     function escapeHtml(s) { return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
