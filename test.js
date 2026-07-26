@@ -13,6 +13,7 @@ const mockFramework = JSON.stringify({
 });
 
 const mockDecision = JSON.stringify({ action: 'ask', question: 'mock-question', reason: 'mock-reason', next_topic_id: null, next_stage: null });
+const mockTransition = JSON.stringify({ action: 'transition', question: 'mock-transition-question', reason: 'mock-transition-reason', next_topic_id: 't2', next_stage: 'introduce' });
 const mockEvaluate = JSON.stringify({
   scores: { naturalness: 4, relevance: 4, probing: 3, single_question: 5, no_bias: 4, progression: 4, ending: 4, persona_fit: 4 },
   overall_comment: 'mock overall comment',
@@ -33,14 +34,14 @@ const mockProvider = http.createServer((req, res) => {
       res.end(JSON.stringify({ data: [{ id: 'mock-model' }] }));
       return;
     }
-    if (req.url === '/v1/chat/completions') {
+      if (req.url === '/v1/chat/completions') {
       res.writeHead(200);
       let content = mockDecision;
       if (body.includes('生成一份结构化访谈框架')) content = mockFramework;
       else if (body.includes('请决定下一步动作')) {
         if (!body.includes('所有字段必须使用简体中文')) throw new Error('missing language guard');
         if (!body.includes('不要重复已经问过的问题')) throw new Error('missing dedupe guard');
-        content = mockDecision;
+        content = body.includes('当前阶段：confirm') ? mockTransition : mockDecision;
       }
       else if (body.includes('评估下面这段')) {
         if (!body.includes('所有字段必须使用简体中文')) throw new Error('missing evaluation language guard');

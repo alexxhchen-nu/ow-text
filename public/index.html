@@ -10,75 +10,29 @@
     body { margin: 0; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif; background: var(--bg); color: var(--text); line-height: 1.5; }
     body::before { content: ""; position: fixed; inset: 0; pointer-events: none; background: radial-gradient(circle at 12% 0%, rgba(200,16,46,0.08), transparent 32%), linear-gradient(90deg, rgba(21,21,21,0.035) 1px, transparent 1px); background-size: auto, 72px 72px; }
     .container { position: relative; max-width: 980px; margin: 0 auto; padding: 32px 24px 56px; }
-    .brand { display: flex; align-items: center; justify-content: flex-start; margin-bottom: 28px; padding-bottom: 18px; border-bottom: 1px solid var(--border); }
-    .brand img { width: min(188px, 52vw); height: auto; display: block; }
-    .brand-mark { display: none; }
-    .card { background: rgba(255,255,255,0.94); border: 1px solid var(--border); border-radius: 28px; padding: clamp(22px, 4vw, 42px); box-shadow: 0 24px 70px var(--shadow); backdrop-filter: blur(10px); }
-    .card::before { content: ""; display: block; width: 64px; height: 5px; margin-bottom: 24px; border-radius: 999px; background: var(--accent); }
-    h1 { margin: 0 0 10px; font-size: clamp(2rem, 5vw, 4rem); line-height: 0.95; letter-spacing: -0.055em; }
+    .brand { display: none; }
+    .card { background: rgba(255,255,255,0.96); border: 1px solid #ece7e1; border-radius: 18px; padding: clamp(22px, 4vw, 40px); box-shadow: 0 8px 24px rgba(15, 15, 15, 0.04); }
+    .card::before { content: ""; display: block; width: 52px; height: 4px; margin-bottom: 20px; border-radius: 999px; background: rgba(21,21,21,0.1); }
+    h1 { margin: 0 0 8px; font-size: clamp(1.8rem, 4vw, 3.4rem); line-height: 0.98; letter-spacing: -0.05em; }
     h3 { letter-spacing: -0.02em; }
-    .subtitle { color: var(--muted); margin: 0 0 32px; max-width: 56ch; font-size: 1.05rem; }
-    label { display: block; font-weight: 650; margin-bottom: 7px; letter-spacing: -0.01em; }
-    textarea, input[type="text"], select { width: 100%; padding: 13px 14px; border: 1px solid var(--border); border-radius: 14px; background: var(--field); color: var(--text); font: inherit; transition: border-color 160ms ease, box-shadow 160ms ease, background 160ms ease; }
-    textarea:focus, input[type="text"]:focus, select:focus { outline: none; border-color: var(--accent); background: #fff; box-shadow: 0 0 0 4px rgba(200,16,46,0.1); }
-    textarea { min-height: 96px; resize: vertical; }
-    select { cursor: pointer; }
-    .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 12px 20px; border: 0; border-radius: 999px; background: var(--text); color: white; font: inherit; font-weight: 650; cursor: pointer; transition: transform 160ms ease, box-shadow 160ms ease, background 160ms ease; }
-    .btn:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 12px 24px var(--shadow); }
-    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
-    .btn.secondary { background: transparent; color: var(--text); border: 1px solid var(--border); }
-    .btn.secondary:hover:not(:disabled) { background: var(--field); }
-    .row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
-    .row > * { flex: 1; }
-    .row > .btn { flex: 0 0 auto; }
-    .chat { display: flex; flex-direction: column; gap: 14px; max-height: 60vh; overflow-y: auto; padding: 8px 4px; }
-    .msg { padding: 14px 17px; border-radius: 20px; max-width: 85%; white-space: pre-wrap; box-shadow: 0 8px 20px rgba(21,21,21,0.05); }
-    .msg.user { align-self: flex-end; background: var(--text); color: white; border-bottom-right-radius: 6px; }
-    .msg.assistant { align-self: flex-start; background: var(--accent-light); border: 1px solid #ffd8de; border-bottom-left-radius: 6px; }
-    .input-area { display: flex; gap: 10px; margin-top: 14px; }
-    .input-area textarea { flex: 1; min-height: 64px; }
-    .hidden { display: none !important; }
-    .spinner { width: 16px; height: 16px; border: 2px solid currentColor; border-bottom-color: transparent; border-radius: 50%; animation: spin 1s linear infinite; }
-    @keyframes spin { to { transform: rotate(360deg); } }
-    .report h2 { margin-top: 0; }
-    .report section { margin-bottom: 24px; }
-    .report h3 { font-size: 1rem; margin-bottom: 8px; }
-    .report ul { padding-left: 20px; }
-    .quote { font-style: italic; color: var(--muted); border-left: 3px solid var(--accent); padding-left: 12px; margin: 8px 0; }
-    .error { color: var(--accent-strong); background: var(--accent-light); padding: 12px; border-radius: 14px; margin-bottom: 12px; border: 1px solid #ffd8de; }
-    .hint { color: var(--muted); font-size: 0.85rem; margin-top: 5px; }
-    .model-row { display: flex; gap: 12px; align-items: flex-start; }
-    .model-row select { flex: 1; }
-    .msg-meta { font-size: 0.75rem; color: var(--muted); margin-top: 7px; line-height: 1.4; }
-    .eval-section { margin-top: 16px; }
-    .score { display: flex; justify-content: space-between; font-size: 0.9rem; padding: 6px 0; border-bottom: 1px solid var(--border); }
-    .score-bar-wrap { width: 100%; height: 7px; background: var(--border); border-radius: 999px; margin-top: 5px; overflow: hidden; }
-    .score-bar { height: 100%; background: var(--accent); border-radius: inherit; }
-    .comment { padding: 14px; background: var(--field); border-radius: 16px; margin-top: 10px; }
-    .framework-editor { width: 100%; min-height: 240px; font-family: ui-monospace, SFMono-Regular, monospace; font-size: 0.85rem; padding: 14px; border: 1px solid var(--border); border-radius: 16px; background: var(--field); color: var(--text); }
-    .topic-card { border: 1px solid var(--border); border-radius: 18px; padding: 16px; margin-bottom: 12px; background: var(--field); }
-    .topic-card h4 { margin: 0 0 6px; font-size: 0.98rem; }
-    .topic-card p { margin: 0; color: var(--muted); font-size: 0.88rem; }
-    .ended-notice { background: var(--accent-light); border: 1px solid #ffd8de; border-radius: 16px; padding: 12px; margin-bottom: 12px; }
-    .progress { margin-top: 14px; padding: 14px; background: var(--accent-light); border: 1px solid #ffd8de; border-radius: 16px; color: var(--muted); }
-    .progress strong { display: block; color: var(--text); margin-bottom: 6px; }
-    .progress-bar { height: 7px; background: #ffd8de; border-radius: 999px; overflow: hidden; }
-    .progress-bar span { display: block; height: 100%; width: 35%; background: var(--accent); border-radius: inherit; animation: progressPulse 1.2s ease-in-out infinite alternate; }
-    .insight-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 18px 0; }
-    .metric-card, .insight-card { padding: 16px; border: 1px solid var(--border); border-radius: 18px; background: var(--field); }
-    .metric-value { font-size: 2.1rem; line-height: 1; font-weight: 760; letter-spacing: -0.05em; }
-    .metric-label, .eyebrow { color: var(--muted); font-size: 0.78rem; letter-spacing: 0.12em; text-transform: uppercase; }
-    .pill-row { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 18px; }
-    .pill { display: inline-flex; align-items: center; gap: 6px; padding: 7px 10px; border-radius: 999px; background: var(--accent-light); color: var(--accent-strong); font-size: 0.86rem; border: 1px solid #ffd8de; }
-    .bar-list { display: grid; gap: 10px; margin: 16px 0; }
-    .bar-item { display: grid; grid-template-columns: 88px 1fr 42px; gap: 10px; align-items: center; font-size: 0.9rem; }
-    .bar-track { height: 9px; overflow: hidden; border-radius: 999px; background: var(--border); }
-    .bar-track span { display: block; height: 100%; border-radius: inherit; background: var(--accent); }
-    .insight-list { display: grid; gap: 10px; margin: 12px 0; }
-    .insight-card strong { display: block; margin-bottom: 6px; }
-    .quick-summary { font-size: 1.15rem; line-height: 1.45; letter-spacing: -0.02em; margin: 8px 0 16px; }
-    @keyframes progressPulse { to { width: 88%; } }
-    @media (max-width: 640px) { .container { padding: 22px 14px 40px; } .brand { align-items: flex-start; flex-direction: column; } .input-area { flex-direction: column; } .row > .btn, .btn { width: 100%; } .model-row { flex-direction: column; } .model-row .btn { margin-top: 0 !important; } .insight-grid { grid-template-columns: 1fr; } .bar-item { grid-template-columns: 76px 1fr 36px; } }
+    .subtitle { color: var(--muted); margin: 0 0 26px; max-width: 56ch; font-size: 1.03rem; }
+    label { display: block; font-weight: 600; margin-bottom: 6px; letter-spacing: -0.01em; }
+    textarea, input[type="text"], select { width: 100%; padding: 13px 14px; border: 1px solid #ddd7d0; border-radius: 12px; background: #fff; color: var(--text); font: inherit; transition: border-color 160ms ease, box-shadow 160ms ease, background 160ms ease; }
+    textarea:focus, input[type="text":focus], select:focus { outline: none; border-color: rgba(200,16,46,0.5); box-shadow: 0 0 0 3px rgba(200,16,46,0.08); }
+    .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 11px 16px; border: 1px solid #ddd7d0; border-radius: 12px; background: #fff; color: var(--text); font: inherit; font-weight: 600; cursor: pointer; transition: background 140ms ease, box-shadow 140ms ease, transform 140ms ease, border-color 140ms ease; }
+    .btn:hover:not(:disabled) { background: #faf8f6; box-shadow: 0 6px 16px rgba(15,15,15,0.05); transform: translateY(-1px); }
+    .btn.secondary { background: #fff; color: var(--text); border: 1px solid #ddd7d0; }
+    .btn.secondary:hover:not(:disabled) { background: #faf8f6; }
+    .msg { padding: 13px 15px; border-radius: 14px; max-width: 85%; white-space: pre-wrap; box-shadow: none; border: 1px solid transparent; }
+    .msg.user { align-self: flex-end; background: #f4f4f2; color: #111; border-color: #e5e2dc; border-bottom-right-radius: 6px; }
+    .msg.assistant { align-self: flex-start; background: #fff; border: 1px solid #ece7e1; border-bottom-left-radius: 6px; }
+    .error { color: #7a1020; background: #faf3f4; padding: 12px; border-radius: 12px; margin-bottom: 12px; border: 1px solid #eed9de; }
+    .hint { color: var(--muted); font-size: 0.84rem; margin-top: 4px; }
+    .metric-card, .insight-card { padding: 14px; border: 1px solid #ece7e1; border-radius: 14px; background: #fff; box-shadow: 0 1px 0 rgba(15,15,15,0.03); }
+    .pill { display: inline-flex; align-items: center; gap: 6px; padding: 6px 9px; border-radius: 999px; background: #f6f3ef; color: #5c4f47; font-size: 0.84rem; border: 1px solid #e8e2dc; }
+    .bar-track { height: 8px; overflow: hidden; border-radius: 999px; background: #ece7e1; }
+    .progress { margin-top: 14px; padding: 14px; background: #f8f7f5; border: 1px solid #e8e2dc; border-radius: 14px; color: var(--muted); }
+    .progress-bar { height: 7px; background: #ece7e1; border-radius: 999px; overflow: hidden; }
   </style>
 </head>
 <body>
@@ -153,10 +107,11 @@
 
     <div id="framework" class="card hidden">
       <h1>研究框架</h1>
-      <p class="subtitle">AI 根据研究设计生成的访谈话题。你可以在下方 JSON 中直接修改。</p>
+      <p class="subtitle">AI 根据研究设计生成的访谈话题。你可以直接修改每个话题块的名称、目标、阶段和问题范围。</p>
       <div id="frameworkPreview"></div>
-      <label for="frameworkEditor" style="margin-top:16px">框架 JSON（可编辑）</label>
-      <textarea id="frameworkEditor" class="framework-editor"></textarea>
+      <label style="margin-top:16px">框架块</label>
+      <div id="frameworkBlocks"></div>
+      <div id="frameworkError" class="error hidden"></div>
       <div class="row" style="margin-top:16px">
         <button id="backToDesignBtn" class="btn secondary">返回修改设计</button>
         <button id="startBtn" class="btn">开始访谈</button>
@@ -296,7 +251,7 @@
       if (!currentConfig.model) { $('setupError').textContent = '请先获取并选择模型。'; return show($('setupError')); }
       $('setupError').textContent = '';
       hide($('setupError'));
-      showProgress('setup', ['正在分析研究目标、受众和场景。', '正在拆分话题和追问边界。', '正在整理可编辑的 JSON 框架。']);
+      showProgress('setup', ['正在分析研究目标、受众和场景。', '正在拆分话题和追问边界。', '正在整理可编辑的话题块。']);
       $('generateFrameworkBtn').disabled = true;
       try {
         const { framework } = await api('/api/interview/framework', { method: 'POST', body: JSON.stringify({ ...currentConfig, ...design }) });
@@ -317,31 +272,98 @@
     };
 
     function renderFramework(fw) {
-      $('frameworkPreview').innerHTML = (fw.topics || []).map(t => `
-        <div class="topic-card">
-          <h4>${escapeHtml(t.name)} <span style="color:var(--muted);font-weight:normal">(${escapeHtml(t.id)})</span></h4>
-          <p>${escapeHtml(t.goal)}</p>
-          <p>阶段：${escapeHtml(t.stage)} · 最少 ${Number(t.min_questions)} 轮 · 最多 ${Number(t.max_questions)} 轮</p>
-        </div>
-      `).join('');
-      $('frameworkEditor').value = JSON.stringify(fw, null, 2);
+      currentFramework = fw;
+      currentDesign = currentDesign || getDesign();
+      $('frameworkPreview').innerHTML = renderFrameworkPreview(fw);
+      $('frameworkBlocks').innerHTML = renderFrameworkBlocks(fw);
+      bindFrameworkEditors();
     }
 
-    function parseFramework() {
-      const text = $('frameworkEditor').value.trim();
-      if (!text) throw new Error('框架内容为空');
-      return JSON.parse(text);
+    function renderFrameworkPreview(fw) {
+      const topics = fw.topics || [];
+      return [
+        '<div class="insight-grid">',
+        `<div class="metric-card"><div class="metric-value">${topics.length}</div><div class="metric-label">话题</div></div>`,
+        `<div class="metric-card"><div class="metric-value">${fw.estimatedTurns || '-'}</div><div class="metric-label">预计轮数</div></div>`,
+        `<div class="metric-card"><div class="metric-value">${(fw.endingCriteria || []).length}</div><div class="metric-label">结束条件</div></div>`,
+        '</div>',
+        `<div class="insight-card"><div class="eyebrow">一眼看懂</div><p class="quick-summary">${escapeHtml(topics[0]?.goal || '暂无主题')}</p></div>`,
+        fw.endingCriteria?.length ? `<div class="pill-row">${fw.endingCriteria.slice(0, 4).map(x => `<span class="pill">${escapeHtml(x)}</span>`).join('')}</div>` : ''
+      ].join('');
     }
+
+    function renderFrameworkBlocks(fw) {
+      const topics = fw.topics || [];
+      return [
+        '<div class="insight-list">',
+        ...topics.map((t, i) => `
+          <div class="insight-card framework-block" data-index="${i}">
+            <div class="row" style="align-items:flex-start; gap:10px">
+              <div style="flex:1">
+                <div class="eyebrow">话题 ${i + 1}</div>
+                <input type="text" data-field="name" value="${escapeAttr(t.name)}" aria-label="话题名称" />
+                <textarea data-field="goal" style="margin-top:10px">${escapeHtml(t.goal || '')}</textarea>
+                <div class="row" style="margin-top:10px">
+                  <select data-field="stage">
+                    ${['introduce','explore','probe','confirm'].map(s => `<option value="${s}" ${s === t.stage ? 'selected' : ''}>${stageLabel(s)}</option>`).join('')}
+                  </select>
+                  <input type="number" min="1" step="1" data-field="min_questions" value="${Number(t.min_questions || 1)}" aria-label="最少问题数" />
+                  <input type="number" min="1" step="1" data-field="max_questions" value="${Number(t.max_questions || 1)}" aria-label="最多问题数" />
+                </div>
+                <textarea data-field="focus_prompt" style="margin-top:10px">${escapeHtml(t.focus_prompt || '')}</textarea>
+              </div>
+            </div>
+          </div>
+        `).join(''),
+        '</div>',
+        '<div class="insight-card" style="margin-top:14px"><div class="eyebrow">结束条件</div><div id="endingCriteriaList"></div></div>'
+      ].join('');
+    }
+
+    function bindFrameworkEditors() {
+      $('frameworkBlocks').querySelectorAll('.framework-block').forEach(block => {
+        const index = Number(block.dataset.index);
+        block.querySelectorAll('[data-field]').forEach(el => {
+          const field = el.dataset.field;
+          const evt = el.tagName === 'SELECT' || el.type === 'number' ? 'change' : 'input';
+          el.addEventListener(evt, () => {
+            const topic = currentFramework.topics[index];
+            topic[field] = el.type === 'number' ? Number(el.value || 0) : el.value;
+            if (field === 'min_questions' || field === 'max_questions') {
+              topic[field] = Math.max(1, Number(el.value || 1));
+            }
+          });
+        });
+      });
+      const endingHost = $('endingCriteriaList');
+      if (endingHost) {
+        endingHost.innerHTML = (currentFramework.endingCriteria || []).map((item, i) => `
+          <div class="row" style="margin-top:${i ? '8px' : '0'}">
+            <input type="text" data-ending-index="${i}" value="${escapeAttr(item)}" />
+          </div>
+        `).join('');
+        endingHost.querySelectorAll('[data-ending-index]').forEach(input => {
+          input.addEventListener('input', () => {
+            currentFramework.endingCriteria[input.dataset.endingIndex] = input.value;
+          });
+        });
+      }
+    }
+
+    function stageLabel(s) {
+      return { introduce: 'introduce', explore: 'explore', probe: 'probe', confirm: 'confirm' }[s] || s;
+    }
+
+    function escapeAttr(s) { return String(s).replace(/[&"]/g, c => ({'&':'&amp;','"':'&quot;'}[c])); }
+
 
     $('startBtn').onclick = async () => {
       try {
-        currentFramework = parseFramework();
-      } catch (e) {
-        $('frameworkError').textContent = '框架 JSON 解析失败：' + e.message;
-        show($('frameworkError'));
-        return;
+        currentFramework = structuredClone(currentFramework);
+      } catch {
+        currentFramework = JSON.parse(JSON.stringify(currentFramework));
       }
-      $('frameworkError').textContent = '';
+      if (!currentFramework || !currentFramework.topics?.length) { $('frameworkError').textContent = '框架内容为空'; show($('frameworkError')); return; }
       $('startBtn').disabled = true;
       try {
         const { id, message, topic_name, stage, action, reason, interviewEnded } = await api('/api/interview/start', { method: 'POST', body: JSON.stringify({ ...currentConfig, ...currentDesign, framework: currentFramework }) });

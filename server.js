@@ -253,9 +253,9 @@ async function decideNext(session, userText, apiKey) {
     const decision = JSON.parse(extractFirstJson(raw));
     return {
       action: decision.action || 'ask',
-      question: decision.question || raw,
+      question: decision.question || (decision.action === 'transition' ? '我们先切到下一个话题，继续往下聊。' : raw),
       reason: decision.reason || '',
-      next_topic_id: decision.next_topic_id || null,
+      next_topic_id: decision.next_topic_id || (decision.action === 'transition' ? getNextTopicId(fw, state.currentTopicId) : null),
       next_stage: decision.next_stage || 'introduce',
     };
   } catch {
