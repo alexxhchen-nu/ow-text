@@ -58,7 +58,7 @@ mockProvider.listen(3001, async () => {
   await new Promise(r => setTimeout(r, 800));
 
   const base = 'http://localhost:3002';
-  const cfg = { provider: 'openai', baseUrl: 'http://localhost:3001/v1', apiKey: 'fake-key', model: 'mock-model' };
+  const cfg = { provider: 'openai', baseUrl: 'http://localhost:3001/v1/chat/completions', apiKey: 'fake-key', model: 'mock-model' };
   const design = { goal: 'test goal', targetAudience: 'test audience', scenarios: 'test scenario', persona: 'test persona', methodology: 'JTBD' };
 
   try {

@@ -31,7 +31,7 @@ async function saveSession(session) {
 }
 
 function normalizeBaseUrl(provider, baseUrl) {
-  if (baseUrl) return baseUrl.replace(/\/$/, '');
+  if (baseUrl) return baseUrl.replace(/\/(chat\/completions|messages|models)\/?$/, '').replace(/\/$/, '');
   return DEFAULT_BASE_URLS[provider] || '';
 }
 
