@@ -144,7 +144,7 @@ async function generateFramework(design, apiKey, provider, baseUrl, model) {
   const raw = await providerChat({
     provider, baseUrl, apiKey, model,
     messages: [
-      { role: 'system', content: '你是一位资深用户研究设计师，擅长把研究目标拆成可执行、可追踪的访谈话题。' },
+      { role: 'system', content: '你是一位资深用户研究设计师，擅长把研究目标拆成可执行、可追踪的访谈话题。所有输出必须使用简体中文；不得夹杂其他语言。' },
       { role: 'user', content: prompt },
     ],
     jsonMode: true,
@@ -229,7 +229,10 @@ async function decideNext(session, userText, apiKey) {
     `- transition：当前话题已探索足够，转移到下一话题。\n` +
     `- end：所有话题已探索完毕，或受访者明确想结束，或已连续无新信息。\n\n` +
     `规则：\n` +
+    `- 所有字段必须使用简体中文，不得出现越南语、英语或其他语言。\n` +
     `- 一次只问一个问题。\n` +
+    `- 不要重复已经问过的问题；如果历史里已有相同意图，必须换一个更具体的新角度。\n` +
+    `- 每个问题必须基于受访者刚刚说过的具体内容或当前话题目标。\n` +
     `- 问题要自然、对话式，不要像问卷。\n` +
     `- 如果受访者说「没了」「就这样」「结束」「不知道了」，优先选择 end（如果话题已够）或 transition（如果还有话题）。\n` +
     `- 如果受访者给出了值得深挖的新信息，优先选择 probe。\n` +
@@ -241,7 +244,7 @@ async function decideNext(session, userText, apiKey) {
     apiKey,
     model: session.model,
     messages: [
-      { role: 'system', content: '你是一位资深定性研究访谈主持人，擅长动态把握访谈节奏、自然过渡话题、并在合适时机结束访谈。' },
+      { role: 'system', content: '你是一位资深定性研究访谈主持人，擅长动态把握访谈节奏、自然过渡话题、并在合适时机结束访谈。所有输出必须使用简体中文；不得夹杂越南语、英语或其他语言。避免重复已问过的问题。' },
       { role: 'user', content: prompt },
     ],
     jsonMode: true,

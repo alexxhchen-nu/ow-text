@@ -55,6 +55,11 @@
     .topic-card h4 { margin: 0 0 6px; font-size: 0.95rem; }
     .topic-card p { margin: 0; color: var(--muted); font-size: 0.85rem; }
     .ended-notice { background: var(--accent-light); border: 1px solid var(--border); border-radius: 8px; padding: 12px; margin-bottom: 12px; }
+    .progress { margin-top: 12px; padding: 12px; background: var(--accent-light); border: 1px solid var(--border); border-radius: 8px; color: var(--muted); }
+    .progress strong { display: block; color: var(--text); margin-bottom: 6px; }
+    .progress-bar { height: 6px; background: var(--border); border-radius: 999px; overflow: hidden; }
+    .progress-bar span { display: block; height: 100%; width: 35%; background: var(--accent); border-radius: inherit; animation: progressPulse 1.2s ease-in-out infinite alternate; }
+    @keyframes progressPulse { to { width: 88%; } }
   </style>
 </head>
 <body>
@@ -119,6 +124,11 @@
       <div class="row" style="margin-top:16px">
         <button id="generateFrameworkBtn" class="btn" disabled>生成访谈框架</button>
       </div>
+      <div id="setupProgress" class="progress hidden">
+        <strong id="setupProgressTitle">正在生成访谈框架…</strong>
+        <div id="setupProgressText">正在分析研究目标、受众和场景。</div>
+        <div class="progress-bar" style="margin-top:10px"><span></span></div>
+      </div>
       <div id="setupError" class="error hidden"></div>
     </div>
 
@@ -144,7 +154,7 @@
         访谈已自然结束。你可以查看报告，或继续补充回答。
       </div>
       <div id="messages" class="chat"></div>
-      <div id="typing" class="hidden" style="color:var(--muted); padding:8px 0">主持人正在输入…</div>
+      <div id="typing" class="hidden" style="color:var(--muted); padding:8px 0">主持人正在理解你的回答，检查是否需要追问或换话题…</div>
       <div class="input-area">
         <textarea id="answer" placeholder="输入你的回答…"></textarea>
         <button id="sendBtn" class="btn">发送</button>
@@ -181,6 +191,25 @@
 
     function show(el) { el.classList.remove('hidden'); }
     function hide(el) { el.classList.add('hidden'); }
+    let progressTimer = null;
+
+    function showProgress(scope, steps) {
+      let i = 0;
+      $('setupProgressTitle').textContent = scope === 'setup' ? '正在生成访谈框架…' : '正在生成下一个问题…';
+      $('setupProgressText').textContent = steps[0];
+      show($('setupProgress'));
+      clearInterval(progressTimer);
+      progressTimer = setInterval(() => {
+        i = Math.min(i + 1, steps.length - 1);
+        $('setupProgressText').textContent = steps[i];
+      }, 1800);
+    }
+
+    function hideProgress() {
+      clearInterval(progressTimer);
+      progressTimer = null;
+      hide($('setupProgress'));
+    }
 
     function appendMessage(role, text, meta = {}) {
       const div = document.createElement('div');
@@ -222,7 +251,7 @@
 
     $('fetchModelsBtn').onclick = async () => {
       const cfg = getConfig();
-      if (!cfg.apiKey) return $('modelsError').textContent = '请先填写 API Key。';
+      if (!cfg.apiKey) { $('modelsError').textContent = '请先填写 API Key。'; return show($('modelsError')); }
       $('fetchModelsBtn').disabled = true;
       hide($('modelsError'));
       $('model').innerHTML = '<option value="">加载中…</option>';
@@ -242,11 +271,13 @@
 
     $('generateFrameworkBtn').onclick = async () => {
       const design = getDesign();
-      if (!design.goal) return $('setupError').textContent = '请输入研究目标。';
+      if (!design.goal) { $('setupError').textContent = '请输入研究目标。'; return show($('setupError')); }
       currentConfig = getConfig();
-      if (!currentConfig.apiKey) return $('setupError').textContent = '请填写 API Key。';
-      if (!currentConfig.model) return $('setupError').textContent = '请先获取并选择模型。';
+      if (!currentConfig.apiKey) { $('setupError').textContent = '请填写 API Key。'; return show($('setupError')); }
+      if (!currentConfig.model) { $('setupError').textContent = '请先获取并选择模型。'; return show($('setupError')); }
       $('setupError').textContent = '';
+      hide($('setupError'));
+      showProgress('setup', ['正在分析研究目标、受众和场景。', '正在拆分话题和追问边界。', '正在整理可编辑的 JSON 框架。']);
       $('generateFrameworkBtn').disabled = true;
       try {
         const { framework } = await api('/api/interview/framework', { method: 'POST', body: JSON.stringify({ ...currentConfig, ...design }) });
@@ -258,7 +289,7 @@
       } catch (e) {
         $('setupError').textContent = e.message;
         show($('setupError'));
-      } finally { $('generateFrameworkBtn').disabled = false; }
+      } finally { hideProgress(); $('generateFrameworkBtn').disabled = false; }
     };
 
     $('backToDesignBtn').onclick = () => {
