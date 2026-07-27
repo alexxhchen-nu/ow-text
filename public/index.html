@@ -10,11 +10,13 @@
     body { margin: 0; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif; background: var(--bg); color: var(--text); line-height: 1.5; }
     body::before { content: ""; position: fixed; inset: 0; pointer-events: none; background: radial-gradient(circle at 12% 0%, rgba(245,196,0,0.18), transparent 30%), linear-gradient(90deg, rgba(17,17,17,0.035) 1px, transparent 1px); background-size: auto, 72px 72px; }
     .container { position: relative; max-width: 1320px; margin: 0 auto; padding: 24px; }
-    .layout { display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 20px; align-items: start; }
-    .sidebar, .stage { min-width: 0; }
-    .sidebar { position: sticky; top: 24px; }
+    .layout { display: grid; grid-template-columns: 320px minmax(460px, 1fr) 360px; gap: 18px; align-items: start; }
+    .sidebar, .stage, .rightbar { min-width: 0; }
+    .sidebar, .rightbar { position: sticky; top: 24px; }
     .sidebar.is-collapsed { display: none; }
     .main-stack { display: grid; gap: 18px; }
+    .compact-card { padding: 18px; }
+    .compact-card h1 { font-size: 1.45rem; }
     .panel { background: rgba(255,255,255,0.96); border: 1px solid #ece7e1; border-radius: 18px; padding: 18px; box-shadow: 0 8px 24px rgba(15,15,15,0.04); }
     .panel details { margin-top: 10px; }
     .panel summary { cursor: pointer; font-weight: 600; }
@@ -124,7 +126,6 @@
     </div>
       </aside>
       <main class="stage main-stack">
-        <div id="framework" class="card hidden">
       <h1>研究框架</h1>
       <p class="subtitle">AI 根据研究设计生成的访谈话题。你可以直接修改每个话题块的名称、目标、阶段和问题范围。</p>
       <div id="frameworkPreview"></div>
@@ -138,7 +139,7 @@
       <div id="frameworkError" class="error hidden"></div>
     </div>
 
-    <div id="chat" class="card hidden">
+    <div id="chat" class="card">
       <div class="row" style="justify-content:space-between; margin-bottom:12px">
         <h1 style="font-size:1.25rem">访谈</h1>
         <button id="endBtn" class="btn secondary">结束并生成报告</button>
@@ -158,7 +159,9 @@
       <div id="chatError" class="error hidden"></div>
     </div>
 
-    <div id="report" class="card hidden report">
+    </main>
+      <aside class="rightbar main-stack">
+        <div id="report" class="card compact-card report">
       <div class="row" style="justify-content:space-between; margin-bottom:16px">
         <h1>洞察报告</h1>
         <div class="row" style="flex:0 0 auto">
@@ -174,7 +177,7 @@
       </details>
       <div id="reportContent"></div>
     </div>
-      </main>
+      </aside>
     </div>
   </div>
 
@@ -197,11 +200,6 @@
     function show(el) { el.classList.remove('hidden'); }
     function hide(el) { el.classList.add('hidden'); }
 
-    function toggleSidebar() {
-      sidebarCollapsed = !sidebarCollapsed;
-      $('setup').classList.toggle('is-collapsed', sidebarCollapsed);
-      $('toggleSidebarBtn').textContent = sidebarCollapsed ? '展开侧栏' : '收起侧栏';
-    }
     let progressTimer = null;
 
     function showProgress(scope, steps) {
@@ -296,10 +294,8 @@
         currentFramework = framework;
         currentDesign = design;
         renderFramework(framework);
-        hide($('setup'));
         show($('framework'));
-        show($('toggleSidebarBtn'));
-        $('toggleSidebarBtn').style.display = 'inline-flex';
+        $('framework').scrollIntoView({ behavior: 'smooth', block: 'start' });
       } catch (e) {
         $('setupError').textContent = e.message;
         show($('setupError'));
@@ -307,8 +303,7 @@
     };
 
     $('backToDesignBtn').onclick = () => {
-      hide($('framework'));
-      show($('setup'));
+      $('setup').scrollIntoView({ behavior: 'smooth', block: 'start' });
     };
 
     function renderFramework(fw) {
@@ -408,11 +403,8 @@
       try {
         const { id, message, topic_name, stage, action, reason, interviewEnded } = await api('/api/interview/start', { method: 'POST', body: JSON.stringify({ ...currentConfig, ...currentDesign, framework: currentFramework }) });
         sessionId = id;
-        hide($('framework'));
         show($('chat'));
         show($('nextQuestionBtn'));
-        show($('toggleSidebarBtn'));
-        $('toggleSidebarBtn').style.display = 'inline-flex';
         show($('downloadCsvBtn'));
         appendMessage('assistant', message, { topic_name, stage, action, reason });
         if (interviewEnded) { show($('endedNotice')); hide($('nextQuestionBtn')); }
@@ -439,7 +431,6 @@
       } finally { hide($('typing')); $('sendBtn').disabled = false; $('answer').focus(); }
     }
 
-    $('toggleSidebarBtn').onclick = toggleSidebar;
     $('sendBtn').onclick = send;
     $('nextQuestionBtn').onclick = async () => { $('answer').value = '继续'; await send(); };
     $('downloadCsvBtn').onclick = downloadCsv;
@@ -450,7 +441,6 @@
       try {
         const data = await api(`/api/interview/${sessionId}/report`, { method: 'POST', body: JSON.stringify({ apiKey: currentConfig.apiKey }) });
         renderReport(data);
-        hide($('chat'));
         renderTranscriptTable();
         show($('report'));
       } catch (e) {
