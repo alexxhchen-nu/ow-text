@@ -93,7 +93,7 @@ mockProvider.listen(3001, async () => {
     // Send message
     const msgRes = await fetch(`${base}/api/interview/${start.id}/message`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: 'hello', apiKey: cfg.apiKey }) });
     const msg = await msgRes.json();
-    if (msg.message !== 'mock-question') throw new Error('message reply failed: ' + msg.message);
+    if (msg.message === 'mock-question') throw new Error('message repeated previous question');
 
     // Generate report
     const reportRes = await fetch(`${base}/api/interview/${start.id}/report`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ apiKey: cfg.apiKey }) });

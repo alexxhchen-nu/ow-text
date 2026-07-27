@@ -18,8 +18,8 @@
     .stage-shell { flex:1; min-height:0; display:flex; flex-direction:column; gap:14px; max-width:1240px; width:100%; margin:0 auto; }
     .card { background:rgba(255,253,248,.88); border:1px solid rgba(230,222,206,.9); border-radius:30px; padding:24px; box-shadow:var(--shadow); overflow:auto; backdrop-filter:blur(20px); }
     .card::before { display:none; }
-    #setup, #framework, #chat, #report { min-height:0; }
-    #setup, #framework, #report { flex:1; }
+    #setup, #framework, #chat, #report, #thanks { min-height:0; }
+    #setup, #framework, #report, #thanks { flex:1; }
     #report { display:flex; flex-direction:column; }
     #reportContent { flex:1; min-height:0; }
     #reportContent > section { min-height:100%; display:flex; flex-direction:column; }
@@ -220,6 +220,14 @@
       <div id="chatError" class="error hidden"></div>
           </div>
         </div>
+          <div id="thanks" class="card phase-panel hidden" style="display:flex;align-items:center;justify-content:center;text-align:center">
+            <div style="max-width:560px">
+              <div class="eyebrow">Interview complete</div>
+              <h1 style="font-size:2.5rem;margin-top:10px">感谢你的分享</h1>
+              <p class="subtitle" style="font-size:1.05rem">本次访谈已经结束。你的回答已经提交，感谢你花时间帮助我们理解真实体验。</p>
+            </div>
+          </div>
+
           <div id="report" class="card phase-panel hidden">
       <div class="row" style="justify-content:space-between; margin-bottom:16px">
         <h1>洞察报告</h1>
@@ -260,14 +268,16 @@
     function show(el) { el.classList.remove('hidden'); }
     function hide(el) { el.classList.add('hidden'); }
 
-    const phases = ['setup', 'framework', 'role', 'chat', 'report'];
+    const phases = ['setup', 'framework', 'role', 'chat', 'thanks', 'report'];
     function setPhase(phase) {
       phases.forEach((p, i) => {
         const active = p === phase;
         $(p).classList.toggle('hidden', !active);
         const step = document.querySelector(`[data-phase-step="${p}"]`);
-        step.classList.toggle('active', active);
-        step.classList.toggle('done', phases.indexOf(phase) > i);
+        if (step) {
+          step.classList.toggle('active', active);
+          step.classList.toggle('done', phases.indexOf(phase) > i);
+        }
       });
     }
 
@@ -480,6 +490,7 @@
         setPhase('chat');
         show($('nextQuestionBtn'));
         show($('downloadCsvBtn'));
+        if (interviewEnded && userMode === 'respondent') { setPhase('thanks'); return; }
         appendMessage('assistant', message, { topic_name, stage, action, reason });
         if (interviewEnded) { show($('endedNotice')); hide($('nextQuestionBtn')); }
       } catch (e) {
@@ -497,6 +508,7 @@
       show($('typing'));
       try {
         const { message, topic_name, stage, action, reason, interviewEnded } = await api(`/api/interview/${sessionId}/message`, { method: 'POST', body: JSON.stringify({ text, apiKey: currentConfig.apiKey }) });
+        if (interviewEnded && userMode === 'respondent') { setPhase('thanks'); return; }
         appendMessage('assistant', message, { topic_name, stage, action, reason });
         if (interviewEnded) { show($('endedNotice')); hide($('nextQuestionBtn')); }
       } catch (e) {

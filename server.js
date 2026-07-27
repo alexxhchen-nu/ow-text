@@ -200,6 +200,12 @@ function transcriptText(session) {
   return session.messages.map(m => `${m.role === 'user' ? '受访者' : '主持人'}：${m.text}`).join('\n\n');
 }
 
+function repeatedQuestion(session, text) {
+  const norm = s => String(s).replace(/[\s。？！?！,.，]/g, '');
+  const current = norm(text);
+  return current && session.messages.some(m => m.role === 'assistant' && norm(m.text) === current);
+}
+
 async function decideNext(session, userText, apiKey) {
   if (session.state.interviewEnded) {
     return { action: 'end', question: '访谈已经结束，谢谢你的时间。', reason: 'already ended', next_topic_id: null, next_stage: null };
@@ -209,6 +215,11 @@ async function decideNext(session, userText, apiKey) {
   const currentTopic = getTopic(fw, state.currentTopicId);
   const nextTopicId = getNextTopicId(fw, state.currentTopicId);
   const history = transcriptText(session);
+  const askedQuestions = session.messages
+    .filter(m => m.role === 'assistant')
+    .map(m => m.text)
+    .slice(-8)
+    .join('\n');
   const prompt = `你是一位经验丰富的定性研究访谈主持人。当前访谈遵循一个预设框架，请根据对话状态决定下一步动作。\n\n` +
     `访谈框架：\n${JSON.stringify(fw, null, 2)}\n\n` +
     `当前状态：\n` +
@@ -220,13 +231,14 @@ async function decideNext(session, userText, apiKey) {
     `- 下一话题：${nextTopicId ? getTopic(fw, nextTopicId).name : '无'}\n` +
     `- 自然结束标准：${fw.endingCriteria?.join('；') || '所有话题探索完毕'}\n\n` +
     `对话历史：\n${history}\n\n` +
+    `已经问过的问题（禁止重复同一意图）：\n${askedQuestions || '暂无'}\n\n` +
     `${userText ? `受访者刚说：「${userText}」\n\n` : ''}` +
     `请决定下一步动作并生成下一个问题。返回 JSON：\n` +
     `{\n  "action": "ask | probe | transition | end",\n  "question": "要问受访者的下一个简洁问题。如果 action=end，则是感谢收尾语。",\n  "reason": "选择这个动作和问题的理由，结合当前话题、阶段和受访者回答",\n  "next_topic_id": "如果 action=transition，填写下一话题 id；否则省略或为空",\n  "next_stage": "如果 action=transition，填写下一话题进入阶段（introduce/explore/probe/confirm）；否则省略或为空"\n}\n\n` +
     `动作说明：\n` +
     `- ask：继续在当前话题当前阶段提一个新问题。\n` +
     `- probe：对受访者刚说的内容做一次深入追问（动机、例子、感受、原因）。\n` +
-    `- transition：当前话题已探索足够，转移到下一话题。\n` +
+    `- transition：当前话题已探索足够，转移到下一话题；question 字段必须直接提出下一话题的第一个具体问题，不能只说“继续往下聊”。\n` +
     `- end：所有话题已探索完毕，或受访者明确想结束，或已连续无新信息。\n\n` +
     `规则：\n` +
     `- 所有字段必须使用简体中文，不得出现越南语、英语或其他语言。\n` +
@@ -237,9 +249,10 @@ async function decideNext(session, userText, apiKey) {
     `- 如果信息足够，就直接 transition 到下一个话题。\n` +
     `- 如果受访者说「没了」「就这样」「结束」「不知道了」，优先选择 end（如果话题已够）或 transition（如果还有话题）。\n` +
     `- 如果受访者给出了值得深挖的新信息，优先选择 probe。\n` +
-    `- 如果受访者向你提问，先简短回应并澄清对方的问题，再回到访谈；不要忽略对方的问题。\n` +
-    `- 如果受访者的回答含糊、抽象或可能有歧义，先用自然语言帮助对方澄清（clarify）再推进；不要立刻跳到下一个主题。\n` +
+    `- 如果受访者向你提问，必须先回答/解释/澄清这个问题，再提出一个新的、不同意图的后续问题；禁止只重复上一题。\n` +
+    `- 如果受访者的回答含糊、抽象或可能有歧义，先用自然语言帮助对方澄清（clarify）：复述你理解到的点 + 问一个更具体的澄清问题；不要原样重问。\n` +
     `- 如果受访者的回答已经清楚、具体、有例子，就继续推进，不要重复确认。\n` +
+    `- 不要重复已经问过的问题；如果必须留在同一话题，也要换成更具体的新角度。\n` +
     `- 如果当前话题已满足 min_questions 且受访者没有新信息，优先 transition。\n` +
     `- 如果所有话题都完成，必须选择 end。`;
   const raw = await providerChat({
@@ -248,18 +261,26 @@ async function decideNext(session, userText, apiKey) {
     apiKey,
     model: session.model,
     messages: [
-      { role: 'system', content: '你是一位资深定性研究访谈主持人，擅长动态把握访谈节奏、自然过渡话题、并在合适时机结束访谈。所有输出必须使用简体中文；不得夹杂越南语、英语或其他语言。避免重复已问过的问题。' },
+      { role: 'system', content: '你是一位资深定性研究访谈主持人，擅长动态把握访谈节奏、先澄清受访者问题再推进、自然过渡话题、并在合适时机结束访谈。所有输出必须使用简体中文；不得夹杂越南语、英语或其他语言。禁止重复已问过的问题；同一话题内也必须换新角度。' },
       { role: 'user', content: prompt },
     ],
     jsonMode: true,
   });
   try {
     const decision = JSON.parse(extractFirstJson(raw));
+    const nextId = decision.next_topic_id || (decision.action === 'transition' ? getNextTopicId(fw, state.currentTopicId) : null);
+    let question = decision.question || (decision.action === 'transition' && nextId ? `我们进入「${getTopic(fw, nextId).name}」。${getTopic(fw, nextId).focus_prompt}` : raw);
+    if (decision.action === 'transition' && question.includes('继续往下聊') && nextId) {
+      question = `我们进入「${getTopic(fw, nextId).name}」。${getTopic(fw, nextId).focus_prompt}`;
+    }
+    if (repeatedQuestion(session, question)) {
+      question = `换一个角度说，${currentTopic.focus_prompt}`;
+    }
     return {
       action: decision.action || 'ask',
-      question: decision.question || (decision.action === 'transition' ? '我们先切到下一个话题，继续往下聊。' : raw),
+      question,
       reason: decision.reason || '',
-      next_topic_id: decision.next_topic_id || (decision.action === 'transition' ? getNextTopicId(fw, state.currentTopicId) : null),
+      next_topic_id: nextId,
       next_stage: decision.next_stage || 'introduce',
     };
   } catch {
@@ -433,7 +454,7 @@ const server = http.createServer(async (req, res) => {
     const body = JSON.parse(await readBody(req) || '{}');
     if (!body.text?.trim()) return bad(res, 'text is required');
     if (!body.apiKey) return bad(res, 'apiKey is required');
-    if (session.state.interviewEnded) return json(res, 200, { message: '访谈已经结束。你可以点击生成报告。', interviewEnded: true });
+    if (session.state.interviewEnded) return json(res, 200, { message: '访谈已经结束，谢谢你的时间。', interviewEnded: true });
     session.messages.push({ role: 'user', text: body.text, ts: new Date().toISOString() });
     const reply = await decideNext(session, body.text, body.apiKey);
     updateState(session, reply);
