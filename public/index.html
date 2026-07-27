@@ -543,26 +543,6 @@
         show($('frameworkError'));
       } finally { hideOverlayProgress(); $('startBtn').disabled = false; }
     }
-        currentFramework = structuredClone(currentFramework);
-      } catch {
-        currentFramework = JSON.parse(JSON.stringify(currentFramework));
-      }
-      if (!currentFramework || !currentFramework.topics?.length) { $('frameworkError').textContent = '框架内容为空'; show($('frameworkError')); return; }
-      $('startBtn').disabled = true;
-      try {
-        const { id, message, topic_name, stage, action, reason, interviewEnded } = await api('/api/interview/start', { method: 'POST', body: JSON.stringify({ ...currentConfig, ...currentDesign, framework: currentFramework }) });
-        sessionId = id;
-        setPhase('chat');
-        show($('nextQuestionBtn'));
-        show($('downloadCsvBtn'));
-        if (interviewEnded && userMode === 'respondent') { setPhase('thanks'); return; }
-        appendMessage('assistant', message, { topic_name, stage, action, reason });
-        if (interviewEnded) { show($('endedNotice')); hide($('nextQuestionBtn')); }
-      } catch (e) {
-        $('frameworkError').textContent = e.message;
-        show($('frameworkError'));
-      } finally { $('startBtn').disabled = false; }
-    }
 
     async function send() {
       const text = $('answer').value.trim();
