@@ -7,11 +7,11 @@
   <style>
     :root { --bg:#f7f6f3; --paper:#fff; --ink:#1f1f1f; --muted:#78736c; --line:#e5dfd7; --soft:#f1efeb; --yellow:#f5c400; --shadow:0 12px 30px rgba(16,16,16,.06); }
     * { box-sizing:border-box; }
-    html, body { height:100%; overflow:hidden; }
+    html, body { height:auto; min-height:100%; overflow:auto; }
     body { margin:0; font-family:Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif; background:var(--bg); color:var(--ink); line-height:1.45; }
     body::before { content:""; position:fixed; inset:0; pointer-events:none; background:radial-gradient(circle at 8% 8%, rgba(245,196,0,.18), transparent 28%); }
-    .container { height:100vh; max-width:none; padding:14px; position:relative; }
-    .layout { height:100%; display:grid; grid-template-columns:300px minmax(0,1fr) 340px; gap:14px; }
+    .container { max-width:1320px; margin:0 auto; padding:14px; position:relative; }
+    .layout { display:grid; grid-template-columns:300px minmax(0,1fr) 340px; gap:14px; align-items:start; }
     .sidebar, .stage, .rightbar { min-width:0; height:100%; display:flex; flex-direction:column; gap:14px; overflow:hidden; }
     .brand { display:block; flex:0 0 auto; padding:4px 4px 0; }
     .brand img { width:174px; height:auto; display:block; }
@@ -20,7 +20,7 @@
     #setup, #framework, #chat, #report { min-height:0; }
     #setup { flex:1; overflow:auto; }
     #framework { flex:0 0 44%; overflow:auto; }
-    #chat { flex:1; display:flex; flex-direction:column; overflow:hidden; }
+    #chat { display:flex; flex-direction:column; min-height:420px; max-height:70vh; overflow:hidden; }
     #report { flex:1; overflow:auto; }
     h1 { margin:0 0 8px; font-size:1.45rem; line-height:1; letter-spacing:-.04em; }
     h3 { margin:16px 0 8px; font-size:.98rem; letter-spacing:-.02em; }
