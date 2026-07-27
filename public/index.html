@@ -10,7 +10,7 @@
     body { margin: 0; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif; background: var(--bg); color: var(--text); line-height: 1.5; }
     body::before { content: ""; position: fixed; inset: 0; pointer-events: none; background: radial-gradient(circle at 12% 0%, rgba(245,196,0,0.18), transparent 30%), linear-gradient(90deg, rgba(17,17,17,0.035) 1px, transparent 1px); background-size: auto, 72px 72px; }
     .container { position: relative; max-width: 1320px; margin: 0 auto; padding: 24px; }
-    .layout { display: grid; grid-template-columns: 320px minmax(460px, 1fr) 360px; gap: 18px; align-items: start; }
+    .layout { display: grid; grid-template-columns: 280px minmax(0, 1fr) 320px; gap: 18px; align-items: start; }
     .sidebar, .stage, .rightbar { min-width: 0; }
     .sidebar, .rightbar { position: sticky; top: 24px; }
     .sidebar.is-collapsed { display: none; }
@@ -57,7 +57,6 @@
   <div class="container">
     <header class="brand" aria-label="Oliver Wyman">
       <img src="/OliverWyman-logo-2021.jpg" alt="Oliver Wyman" />
-      <span class="brand-mark" aria-hidden="true">Insights workspace</span>
     </header>
 
     <div id="setup" class="card">
