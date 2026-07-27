@@ -237,6 +237,9 @@ async function decideNext(session, userText, apiKey) {
     `- 如果信息足够，就直接 transition 到下一个话题。\n` +
     `- 如果受访者说「没了」「就这样」「结束」「不知道了」，优先选择 end（如果话题已够）或 transition（如果还有话题）。\n` +
     `- 如果受访者给出了值得深挖的新信息，优先选择 probe。\n` +
+    `- 如果受访者向你提问，先简短回应并澄清对方的问题，再回到访谈；不要忽略对方的问题。\n` +
+    `- 如果受访者的回答含糊、抽象或可能有歧义，先用自然语言帮助对方澄清（clarify）再推进；不要立刻跳到下一个主题。\n` +
+    `- 如果受访者的回答已经清楚、具体、有例子，就继续推进，不要重复确认。\n` +
     `- 如果当前话题已满足 min_questions 且受访者没有新信息，优先 transition。\n` +
     `- 如果所有话题都完成，必须选择 end。`;
   const raw = await providerChat({
