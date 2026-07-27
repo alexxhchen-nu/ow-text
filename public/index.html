@@ -3,12 +3,12 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>OliveWymen Insights</title>
+  <title>Insights</title>
   <style>
-    :root { --bg: #ffffff; --card: #ffffff; --text: #151515; --muted: #69645f; --accent: #c8102e; --accent-strong: #8f001c; --accent-light: #fff2f4; --border: #e8e2dc; --field: #fbfaf8; --shadow: rgba(21,21,21,0.08); }
+    :root { --bg: #ffffff; --card: #ffffff; --text: #111111; --muted: #6f6a63; --accent: #f5c400; --accent-strong: #111111; --accent-light: #fff8d8; --border: #e8e2dc; --field: #fbfaf8; --shadow: rgba(17,17,17,0.08); }
     * { box-sizing: border-box; }
     body { margin: 0; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif; background: var(--bg); color: var(--text); line-height: 1.5; }
-    body::before { content: ""; position: fixed; inset: 0; pointer-events: none; background: radial-gradient(circle at 12% 0%, rgba(200,16,46,0.08), transparent 32%), linear-gradient(90deg, rgba(21,21,21,0.035) 1px, transparent 1px); background-size: auto, 72px 72px; }
+    body::before { content: ""; position: fixed; inset: 0; pointer-events: none; background: radial-gradient(circle at 12% 0%, rgba(245,196,0,0.18), transparent 30%), linear-gradient(90deg, rgba(17,17,17,0.035) 1px, transparent 1px); background-size: auto, 72px 72px; }
     .container { position: relative; max-width: 1320px; margin: 0 auto; padding: 24px; }
     .layout { display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 20px; align-items: start; }
     .sidebar, .stage { min-width: 0; }
@@ -19,7 +19,8 @@
     .panel details { margin-top: 10px; }
     .panel summary { cursor: pointer; font-weight: 600; }
     .panel-body { margin-top: 12px; }
-    .brand { display: none; }
+    .brand { display: block; margin-bottom: 20px; }
+    .brand img { width: min(210px, 58vw); height: auto; display: block; }
     .card { background: rgba(255,255,255,0.96); border: 1px solid #ece7e1; border-radius: 18px; padding: clamp(22px, 4vw, 40px); box-shadow: 0 8px 24px rgba(15, 15, 15, 0.04); }
     .card::before { content: ""; display: block; width: 52px; height: 4px; margin-bottom: 20px; border-radius: 999px; background: rgba(21,21,21,0.1); }
     h1 { margin: 0 0 8px; font-size: clamp(1.8rem, 4vw, 3.4rem); line-height: 0.98; letter-spacing: -0.05em; }
@@ -27,7 +28,7 @@
     .subtitle { color: var(--muted); margin: 0 0 26px; max-width: 56ch; font-size: 1.03rem; }
     label { display: block; font-weight: 600; margin-bottom: 6px; letter-spacing: -0.01em; }
     textarea, input[type="text"], select { width: 100%; padding: 13px 14px; border: 1px solid #ddd7d0; border-radius: 12px; background: #fff; color: var(--text); font: inherit; transition: border-color 160ms ease, box-shadow 160ms ease, background 160ms ease; }
-    textarea:focus, input[type="text":focus], select:focus { outline: none; border-color: rgba(200,16,46,0.5); box-shadow: 0 0 0 3px rgba(200,16,46,0.08); }
+    textarea:focus, input[type="text"]:focus, input[type="number"]:focus, select:focus { outline: none; border-color: rgba(17,17,17,0.45); box-shadow: 0 0 0 3px rgba(245,196,0,0.28); }
     .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 11px 16px; border: 1px solid #ddd7d0; border-radius: 12px; background: #fff; color: var(--text); font: inherit; font-weight: 600; cursor: pointer; transition: background 140ms ease, box-shadow 140ms ease, transform 140ms ease, border-color 140ms ease; }
     .btn:hover:not(:disabled) { background: #faf8f6; box-shadow: 0 6px 16px rgba(15,15,15,0.05); transform: translateY(-1px); }
     .btn.secondary { background: #fff; color: var(--text); border: 1px solid #ddd7d0; }
@@ -35,10 +36,10 @@
     .msg { padding: 13px 15px; border-radius: 14px; max-width: 85%; white-space: pre-wrap; box-shadow: none; border: 1px solid transparent; }
     .msg.user { align-self: flex-end; background: #f4f4f2; color: #111; border-color: #e5e2dc; border-bottom-right-radius: 6px; }
     .msg.assistant { align-self: flex-start; background: #fff; border: 1px solid #ece7e1; border-bottom-left-radius: 6px; }
-    .error { color: #7a1020; background: #faf3f4; padding: 12px; border-radius: 12px; margin-bottom: 12px; border: 1px solid #eed9de; }
+    .error { color: #111; background: #fff8d8; padding: 12px; border-radius: 12px; margin-bottom: 12px; border: 1px solid #f0d76a; }
     .hint { color: var(--muted); font-size: 0.84rem; margin-top: 4px; }
     .metric-card, .insight-card { padding: 14px; border: 1px solid #ece7e1; border-radius: 14px; background: #fff; box-shadow: 0 1px 0 rgba(15,15,15,0.03); }
-    .pill { display: inline-flex; align-items: center; gap: 6px; padding: 6px 9px; border-radius: 999px; background: #f6f3ef; color: #5c4f47; font-size: 0.84rem; border: 1px solid #e8e2dc; }
+    .pill { display: inline-flex; align-items: center; gap: 6px; padding: 6px 9px; border-radius: 999px; background: #fff8d8; color: #111; font-size: 0.84rem; border: 1px solid #f0d76a; }
     .bar-track { height: 8px; overflow: hidden; border-radius: 999px; background: #ece7e1; }
     .progress { margin-top: 14px; padding: 14px; background: #f8f7f5; border: 1px solid #e8e2dc; border-radius: 14px; color: var(--muted); }
     .progress-bar { height: 7px; background: #ece7e1; border-radius: 999px; overflow: hidden; }
@@ -58,7 +59,7 @@
     </header>
 
     <div id="setup" class="card">
-      <h1>OliveWymen Insights</h1>
+      <h1>Insights</h1>
       <p class="subtitle">用 AI 主持深度访谈，先设计研究框架，再自然追问、收尾并生成洞察报告。</p>
 
       <label for="provider">模型提供商</label>
