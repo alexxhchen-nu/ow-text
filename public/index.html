@@ -20,11 +20,11 @@
     .card { background:rgba(255,255,255,.86); border:1px solid rgba(228,231,236,.92); border-radius:32px; padding:30px; box-shadow:var(--shadow); overflow:auto; backdrop-filter:blur(22px); }
     .card::before { display:none; }
     #setup, #framework, #chat, #report, #thanks { min-height:0; }
-    #setup, #framework, #report, #thanks { display:flex; flex-direction:column; }
+    #setup, #framework, #report, #thanks { display:flex; flex-direction:column; height:100%; }
     #setup, #framework, #report, #thanks { flex:1; }
     #report { display:flex; flex-direction:column; }
-    #reportContent { flex:1; min-height:0; }
-    #reportContent > section { min-height:100%; display:flex; flex-direction:column; }
+    #reportContent { flex:1; min-height:0; display:flex; flex-direction:column; gap:16px; }
+    #reportContent > section { flex:1; min-height:0; display:flex; flex-direction:column; gap:16px; }
     #reportContent .insight-grid { grid-template-columns:repeat(3,minmax(180px,1fr)); gap:14px; }
     #reportContent .insight-card, #reportContent .metric-card { padding:18px; }
     #chat { flex:1; display:flex; flex-direction:column; min-height:0; overflow:hidden; }
@@ -75,6 +75,9 @@
     summary { cursor:pointer; list-style:none; font-weight:650; }
     summary::-webkit-details-marker { display:none; }
     .quote { margin-top:8px; padding-left:8px; border-left:3px solid var(--primary); color:var(--muted); font-size:.84rem; }
+    .transcript-table { max-height:260px; overflow:auto; border:1px solid var(--line); border-radius:16px; }
+    #transcriptTable table { margin-top:0; }
+    #transcriptTable th { position:sticky; top:0; background:#f9fafb; z-index:1; }
     .phasebar { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); align-items:center; gap:8px; padding:8px; border:1px solid rgba(228,231,236,.92); border-radius:999px; background:rgba(255,255,255,.82); backdrop-filter:blur(18px); box-shadow:0 14px 36px rgba(16,24,40,.06); }
     .phase { position:relative; min-width:0; padding:10px 12px; border:0; border-radius:999px; background:transparent; color:var(--muted); font:inherit; font-size:.84rem; font-weight:800; white-space:nowrap; cursor:pointer; transition:.22s ease; }
     .phase:not(:last-child)::after { content:"›"; position:absolute; right:-9px; top:50%; color:#98a2b3; transform:translateY(-50%); }
@@ -679,10 +682,12 @@
 
     function renderTranscriptTable() {
       $('transcriptTable').innerHTML = `
+        <div class="transcript-table">
         <table>
           <thead><tr><th>角色</th><th>内容</th><th>话题</th><th>阶段</th></tr></thead>
           <tbody>${transcriptRows.map(r => `<tr><td>${escapeHtml(r.role === 'assistant' ? '主持人' : '受访者')}</td><td>${escapeHtml(r.text)}</td><td>${escapeHtml(r.meta?.topic_name || '')}</td><td>${escapeHtml(r.meta?.stage || '')}</td></tr>`).join('')}</tbody>
         </table>
+        </div>
       `;
     }
 
