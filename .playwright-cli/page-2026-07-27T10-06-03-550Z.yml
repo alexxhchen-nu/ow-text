@@ -1,0 +1,62 @@
+- generic [ref=e2]:
+  - img "Oliver Wyman" [ref=e4]
+  - generic:
+    - generic:
+      - generic: Loading
+      - heading "准备访谈中…" [level=1]
+      - paragraph: 正在生成第一个问题
+      - generic: 0%
+  - main [ref=e6]:
+    - generic [ref=e7]:
+      - generic "Interview phases" [ref=e9]:
+        - button "1 设置 ›" [ref=e10] [cursor=pointer]
+        - button "2 框架 ›" [ref=e11] [cursor=pointer]
+        - button "3 角色选择 ›" [ref=e12] [cursor=pointer]
+        - button "4 访谈 ›" [ref=e13] [cursor=pointer]
+        - button "5 报告" [ref=e14] [cursor=pointer]
+      - generic [ref=e15]:
+        - heading "Insights" [level=1] [ref=e16]
+        - paragraph [ref=e17]: 用 AI 主持深度访谈，先设计研究框架，再自然追问、收尾并生成洞察报告。
+        - generic [ref=e18]: 模型提供商
+        - combobox "模型提供商" [ref=e19]:
+          - option "OpenAI / OpenAI 兼容" [selected]
+          - option "Anthropic"
+          - option "自定义 OpenAI 兼容端点"
+        - paragraph [ref=e20]: Anthropic 将自动使用 /messages，其余兼容端点使用 /chat/completions。
+        - generic [ref=e21]: API 地址（可选）
+        - textbox "API 地址（可选）" [ref=e22]:
+          - /placeholder: 留空使用默认地址
+        - generic [ref=e23]: API Key
+        - textbox "API Key" [ref=e24]:
+          - /placeholder: sk-... 或 anthropic 的 key
+          - text: sk-fake
+        - paragraph [ref=e25]: 仅在请求中临时使用，不会保存到服务器。
+        - generic [ref=e26]:
+          - generic [ref=e27]:
+            - generic [ref=e28]: 模型
+            - combobox "模型" [disabled] [ref=e29]:
+              - option "加载中…" [selected]
+          - button "获取模型" [disabled] [ref=e30]
+        - generic [ref=e31]:
+          - heading "研究设计" [level=3] [ref=e32]
+          - generic [ref=e33]: 研究目标
+          - textbox "研究目标" [ref=e34]:
+            - /placeholder: 例如：了解用户为什么在新手引导阶段流失
+          - generic [ref=e35]: 方法学
+          - combobox "方法学" [ref=e36]:
+            - option "通用" [selected]
+            - option "Jobs-to-be-Done"
+            - option "五问法（5 Whys）"
+            - option "STAR"
+            - option "Persona 画像"
+          - generic [ref=e37]: 目标受众
+          - textbox "目标受众" [ref=e38]:
+            - /placeholder: 例如：25-35 岁一线城市 SaaS 产品经理，每天使用 3+ 工具
+          - generic [ref=e39]: 研究场景
+          - textbox "研究场景" [ref=e40]:
+            - /placeholder: 例如：首次注册、付费决策、流失前最后一次登录
+          - generic [ref=e41]: 受访者画像 / 上下文
+          - textbox "受访者画像 / 上下文" [ref=e42]:
+            - /placeholder: 例如：时间紧张、关注 ROI、对数据敏感
+        - button "生成访谈框架" [disabled] [ref=e44]
+        - text: 0%

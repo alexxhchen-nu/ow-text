@@ -65,12 +65,16 @@ async function listModels({ provider, baseUrl, apiKey }) {
   } else {
     headers['Authorization'] = `Bearer ${apiKey}`;
   }
-  const res = await fetch(url, { headers });
-  if (!res.ok) throw new Error(`Models endpoint ${res.status}: ${await res.text()}`);
-  const text = await res.text();
-  const data = JSON.parse(extractFirstJson(text));
-  const items = data.data || data.models || [];
-  return items.map(m => ({ id: m.id, name: m.id })).sort((a, b) => a.id.localeCompare(b.id));
+  try {
+    const res = await fetch(url, { headers });
+    if (!res.ok) throw new Error(`Models endpoint ${res.status}: ${await res.text()}`);
+    const text = await res.text();
+    const data = JSON.parse(extractFirstJson(text));
+    const items = data.data || data.models || [];
+    return items.map(m => ({ id: m.id, name: m.id })).sort((a, b) => a.id.localeCompare(b.id));
+  } catch (e) {
+    throw new Error(`Cannot fetch models from ${url}: ${e.message}${e.cause ? ` (${e.cause.message})` : ''}`);
+  }
 }
 
 function splitSystem(messages) {
@@ -85,32 +89,37 @@ function splitSystem(messages) {
 
 async function providerChat({ provider, baseUrl, apiKey, model, messages, jsonMode = false }) {
   if (!apiKey) throw new Error('API key is required');
-  if (!model) throw new Error('model is required');
   const base = normalizeBaseUrl(provider, baseUrl);
-  if (provider === 'anthropic') {
-    const { system, chat } = splitSystem(messages);
-    const body = { model, messages: chat, max_tokens: 4096, system: system + (jsonMode ? '\nRespond only with valid JSON.' : '') };
-    const res = await fetch(`${base}/messages`, {
+  if (!base) throw new Error('Provider base URL is required');
+  try {
+    if (!model) throw new Error('model is required');
+    if (provider === 'anthropic') {
+      const { system, chat } = splitSystem(messages);
+      const body = { model, messages: chat, max_tokens: 4096, system: system + (jsonMode ? '\nRespond only with valid JSON.' : '') };
+      const res = await fetch(`${base}/messages`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) throw new Error(`Anthropic ${res.status}: ${await res.text()}`);
+      const text = await res.text();
+      const data = JSON.parse(extractFirstJson(text));
+      return data.content?.[0]?.text ?? '';
+    }
+    const body = { model, messages };
+    if (jsonMode) body.response_format = { type: 'json_object' };
+    const res = await fetch(`${base}/chat/completions`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+      headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
-    if (!res.ok) throw new Error(`Anthropic ${res.status}: ${await res.text()}`);
+    if (!res.ok) throw new Error(`Provider ${res.status}: ${await res.text()}`);
     const text = await res.text();
     const data = JSON.parse(extractFirstJson(text));
-    return data.content?.[0]?.text ?? '';
+    return data.choices?.[0]?.message?.content ?? '';
+  } catch (e) {
+    throw new Error(`Provider ${base} unreachable: ${e.message}${e.cause ? ` (${e.cause.message})` : ''}`);
   }
-  const body = { model, messages };
-  if (jsonMode) body.response_format = { type: 'json_object' };
-  const res = await fetch(`${base}/chat/completions`, {
-    method: 'POST',
-    headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) throw new Error(`Provider ${res.status}: ${await res.text()}`);
-  const text = await res.text();
-  const data = JSON.parse(extractFirstJson(text));
-  return data.choices?.[0]?.message?.content ?? '';
 }
 
 function designContext(design) {

@@ -1,0 +1,26 @@
+- generic [ref=e2]:
+  - img "Oliver Wyman" [ref=e4]
+  - generic:
+    - generic:
+      - generic: Loading
+      - heading "准备访谈中…" [level=1]
+      - paragraph: 正在生成第一个问题
+      - generic: 0%
+  - main [ref=e6]:
+    - generic [ref=e7]:
+      - generic "Interview phases" [ref=e9]:
+        - button "1 设置 ›" [ref=e10] [cursor=pointer]
+        - button "2 框架 ›" [ref=e11] [cursor=pointer]
+        - button "3 角色选择 ›" [ref=e12] [cursor=pointer]
+        - button "4 访谈 ›" [ref=e13] [cursor=pointer]
+        - button "5 报告" [active] [ref=e14] [cursor=pointer]
+      - text: 0%
+    - generic [ref=e45]:
+      - generic [ref=e46]:
+        - heading "洞察报告" [level=1] [ref=e47]
+        - generic [ref=e48]:
+          - button "下载 CSV" [ref=e49] [cursor=pointer]
+          - button "评估访谈" [ref=e50] [cursor=pointer]
+          - button "新建访谈" [ref=e51] [cursor=pointer]
+      - group [ref=e52]:
+        - generic "查看访谈内容" [ref=e53] [cursor=pointer]
