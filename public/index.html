@@ -695,12 +695,21 @@
     }
 
     function downloadCsv() {
-      const rows = [['role','text','topic','stage','time']].concat(transcriptRows.map(r => [r.role, r.text, r.meta?.topic_name || '', r.meta?.stage || '', r.ts || '']));
+      const pairs = [];
+      for (let i = 0; i < transcriptRows.length; i++) {
+        if (transcriptRows[i].role === 'assistant') {
+          const q = transcriptRows[i].text;
+          const a = (i + 1 < transcriptRows.length && transcriptRows[i + 1].role === 'user') ? transcriptRows[i + 1].text : '';
+          pairs.push([pairs.length + 1, q, a]);
+          if (i + 1 < transcriptRows.length && transcriptRows[i + 1].role === 'user') i++;
+        }
+      }
+      const rows = [['问题序号', '问题', '答案']].concat(pairs);
       const csv = rows.map(cols => cols.map(v => `"${String(v).replaceAll('"', '""')}"`).join(',')).join('\n');
-      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
-      a.download = 'interview-transcript.csv';
+      a.download = 'interview-qa.csv';
       a.click();
       URL.revokeObjectURL(a.href);
     }
