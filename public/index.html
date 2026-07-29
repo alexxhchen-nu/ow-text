@@ -109,9 +109,9 @@
 
     <div id="stageOverlay" class="stage-overlay">
       <div class="card">
-        <div class="eyebrow">Loading</div>
-        <h1 style="font-size:1.6rem">准备访谈中…</h1>
-        <p class="subtitle">正在生成第一个问题</p>
+        <div class="eyebrow" id="overlayEyebrow">Loading</div>
+        <h1 style="font-size:1.6rem" id="overlayTitle">准备访谈中…</h1>
+        <p class="subtitle" id="overlaySubtitle">正在生成第一个问题</p>
         <div id="overlayProgress" class="progress-bar" data-pct="0"><span style="width:0%"></span></div>
       </div>
     </div>
@@ -331,7 +331,9 @@
       setTimeout(() => hide($('setupProgress')), 250);
     }
 
-    function showOverlayProgress(label, steps) {
+    function showOverlayProgress(title, steps, subtitle = '请稍候…') {
+      $('overlayTitle').textContent = title;
+      $('overlaySubtitle').textContent = subtitle;
       $('stageOverlay').classList.add('active');
       setProgressBar($('overlayProgress'), 0);
       let i = 0;
@@ -525,7 +527,7 @@
     async function startInterview(mode) {
       userMode = mode;
       document.body.classList.toggle('respondent-mode', mode === 'respondent');
-      showOverlayProgress('准备访谈中…', ['初始化访谈状态', '请模型生成第一个问题', '校验框架与语言']);
+      showOverlayProgress('准备访谈中…', ['初始化访谈状态', '请模型生成第一个问题', '校验框架与语言'], '正在生成第一个问题');
       try {
         currentFramework = structuredClone(currentFramework);
       } catch {
@@ -575,6 +577,7 @@
 
     $('endBtn').onclick = async () => {
       $('endBtn').disabled = true;
+      showOverlayProgress('生成洞察报告中…', ['整理访谈记录', '提取主题与洞察', '生成建议与评估'], '正在生成结构化报告');
       try {
         const data = await api(`/api/interview/${sessionId}/report`, { method: 'POST', body: JSON.stringify({ apiKey: currentConfig.apiKey }) });
         renderReport(data);
@@ -583,7 +586,7 @@
       } catch (e) {
         $('chatError').textContent = e.message;
         show($('chatError'));
-      } finally { $('endBtn').disabled = false; }
+      } finally { $('endBtn').disabled = false; hideOverlayProgress(); }
     };
 
     $('newBtn').onclick = () => { location.reload(); };
