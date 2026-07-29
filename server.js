@@ -307,7 +307,7 @@ function updateState(session, decision) {
     if (nextId) {
       state.currentTopicId = nextId;
       state.topicStage = decision.next_stage || getTopic(fw, nextId).stage || 'introduce';
-      state.topicTurns = 0;
+      state.topicTurns = 1;
     } else {
       state.interviewEnded = true;
     }
