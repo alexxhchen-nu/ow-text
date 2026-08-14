@@ -3,6 +3,7 @@ import fs from 'fs/promises';
 import path from 'path';
 import crypto from 'crypto';
 import { fileURLToPath } from 'url';
+import { PROMPTS, transcriptText, getTopicName } from './prompts.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = path.join(__dirname, 'data');
@@ -149,16 +150,6 @@ function lastUserContent(messages) {
   return '';
 }
 
-function designContext(design) {
-  const { goal, targetAudience, scenarios, persona, methodology } = design;
-  let ctx = `研究目标："${goal}"\n`;
-  if (targetAudience) ctx += `目标受众：${targetAudience}\n`;
-  if (scenarios) ctx += `研究场景：${scenarios}\n`;
-  if (persona) ctx += `受访者画像/上下文：${persona}\n`;
-  if (methodology && methodology !== 'general') ctx += `采用方法学：${methodology}\n`;
-  return ctx;
-}
-
 function validateFramework(fw) {
   if (!fw || !Array.isArray(fw.topics) || fw.topics.length === 0) return false;
   for (const t of fw.topics) {
@@ -167,21 +158,14 @@ function validateFramework(fw) {
   return true;
 }
 
-async function generateFramework(design, apiKey, protocol, baseUrl, model) {
-  const ctx = designContext(design);
-  const prompt = `你是一位资深用户研究设计师。请根据下面的研究设计，生成一份结构化访谈框架。\n\n` +
-    `${ctx}\n\n` +
-    `要求：\n` +
-    `- 把访谈拆成 4-8 个话题（topic），每个话题有清晰的目标。\n` +
-    `- 每个话题包含：id、name（话题名称）、goal（探索目标）、stage（建议进入阶段：introduce/explore/probe/confirm）、min_questions（最少问题数）、max_questions（最多问题数）、focus_prompt（提问时的关注焦点）。\n` +
-    `- 提供 3-5 条自然结束标准。\n` +
-    `- 输出必须是 JSON，格式如下：\n` +
-    `{\n  "topics": [{\n    "id": "t1",\n    "name": "string",\n    "goal": "string",\n    "stage": "introduce",\n    "min_questions": 2,\n    "max_questions": 5,\n    "focus_prompt": "string"\n  }],\n  "endingCriteria": ["string"],\n  "estimatedTurns": 12\n}`;
+async function generateFramework(design, apiKey, protocol, baseUrl, model, lang = 'en') {
+  const p = PROMPTS[lang] || PROMPTS.en;
+  const ctx = p.designContext(design);
   const raw = await chatProvider({
     protocol, baseUrl, apiKey, model,
     messages: [
-      { role: 'system', content: '你是一位资深用户研究设计师，擅长把研究目标拆成可执行、可追踪的访谈话题。所有输出必须使用简体中文；不得夹杂其他语言。' },
-      { role: 'user', content: prompt },
+      { role: 'system', content: p.frameworkSystem },
+      { role: 'user', content: p.framework(ctx) },
     ],
     jsonMode: true,
   });
@@ -190,26 +174,8 @@ async function generateFramework(design, apiKey, protocol, baseUrl, model) {
     if (!validateFramework(fw)) throw new Error('invalid framework structure');
     return fw;
   } catch {
-    return { topics: defaultTopics(design), endingCriteria: defaultEndingCriteria(), estimatedTurns: 12 };
+    return { topics: p.defaultTopics(design), endingCriteria: p.defaultEndingCriteria(), estimatedTurns: 12 };
   }
-}
-
-function defaultTopics(design) {
-  return [
-    { id: 't1', name: '开场与背景', goal: '建立信任并了解受访者基本情况', stage: 'introduce', min_questions: 2, max_questions: 3, focus_prompt: '让对方感到轻松，收集基本背景' },
-    { id: 't2', name: '核心探索', goal: `深入理解研究目标：${design.goal}`, stage: 'explore', min_questions: 3, max_questions: 6, focus_prompt: '围绕研究目标收集事实、行为和痛点' },
-    { id: 't3', name: '深度追问', goal: '挖掘动机、感受和具体例子', stage: 'probe', min_questions: 2, max_questions: 4, focus_prompt: '追问为什么、情绪和具体场景' },
-    { id: 't4', name: '收尾确认', goal: '总结关键信息并感谢受访者', stage: 'confirm', min_questions: 1, max_questions: 2, focus_prompt: '确认理解无误，给对方补充机会' },
-  ];
-}
-
-function defaultEndingCriteria() {
-  return [
-    '所有话题已充分探索，受访者没有提供新的信息',
-    '受访者明确表示结束或没有更多内容',
-    '主持人已连续确认两次，受访者没有补充',
-    '已达到预估轮数且每个话题满足最小问题数',
-  ];
 }
 
 function initState(framework) {
@@ -232,72 +198,35 @@ function getNextTopicId(framework, currentTopicId) {
   return null;
 }
 
-function transcriptText(session) {
-  return session.messages.map(m => `${m.role === 'user' ? '受访者' : '主持人'}：${m.text}`).join('\n\n');
-}
-
 function repeatedQuestion(session, text) {
   const norm = s => String(s).replace(/[\s。？！?！,.，]/g, '');
   const current = norm(text);
   return current && session.messages.some(m => m.role === 'assistant' && norm(m.text) === current);
 }
 
-async function decideNext(session, userText, apiKey) {
+async function decideNext(session, userText, apiKey, lang = 'en') {
+  const p = PROMPTS[lang] || PROMPTS.en;
   if (session.state.interviewEnded) {
-    return { action: 'end', question: '访谈已经结束，谢谢你的时间。', reason: 'already ended', next_topic_id: null, next_stage: null };
+    return { action: 'end', question: p.fallbackEnd, reason: 'already ended', next_topic_id: null, next_stage: null };
   }
   const fw = session.framework;
   const state = session.state;
   const currentTopic = getTopic(fw, state.currentTopicId);
   const nextTopicId = getNextTopicId(fw, state.currentTopicId);
-  const history = transcriptText(session);
+  const history = transcriptText(session, lang);
   const askedQuestions = session.messages
     .filter(m => m.role === 'assistant')
     .map(m => m.text)
     .slice(-8)
     .join('\n');
-  const prompt = `你是一位经验丰富的定性研究访谈主持人。当前访谈遵循一个预设框架，请根据对话状态决定下一步动作。\n\n` +
-    `访谈框架：\n${JSON.stringify(fw, null, 2)}\n\n` +
-    `当前状态：\n` +
-    `- 当前话题：${currentTopic.name}（id: ${currentTopic.id}）\n` +
-    `- 话题目标：${currentTopic.goal}\n` +
-    `- 当前阶段：${state.topicStage}\n` +
-    `- 本话题已进行轮数：${state.topicTurns}（建议最少 ${currentTopic.min_questions}，最多 ${currentTopic.max_questions}）\n` +
-    `- 总轮数：${state.totalTurns}（预估 ${fw.estimatedTurns || 12}）\n` +
-    `- 下一话题：${nextTopicId ? getTopic(fw, nextTopicId).name : '无'}\n` +
-    `- 自然结束标准：${fw.endingCriteria?.join('；') || '所有话题探索完毕'}\n\n` +
-    `对话历史：\n${history}\n\n` +
-    `已经问过的问题（禁止重复同一意图）：\n${askedQuestions || '暂无'}\n\n` +
-    `${userText ? `受访者刚说：「${userText}」\n\n` : ''}` +
-    `请决定下一步动作并生成下一个问题。返回 JSON：\n` +
-    `{\n  "action": "ask | probe | transition | end",\n  "question": "要问受访者的下一个简洁问题。如果 action=end，则是感谢收尾语。",\n  "reason": "选择这个动作和问题的理由，结合当前话题、阶段和受访者回答",\n  "next_topic_id": "如果 action=transition，填写下一话题 id；否则省略或为空",\n  "next_stage": "如果 action=transition，填写下一话题进入阶段（introduce/explore/probe/confirm）；否则省略或为空"\n}\n\n` +
-    `动作说明：\n` +
-    `- ask：继续在当前话题当前阶段提一个新问题。\n` +
-    `- probe：对受访者刚说的内容做一次深入追问（动机、例子、感受、原因）。\n` +
-    `- transition：当前话题已探索足够，转移到下一话题；question 字段必须直接提出下一话题的第一个具体问题，不能只说“继续往下聊”。\n` +
-    `- end：所有话题已探索完毕，或受访者明确想结束，或已连续无新信息。\n\n` +
-    `规则：\n` +
-    `- 所有字段必须使用简体中文，不得出现越南语、英语或其他语言。\n` +
-    `- 一次只问一个问题。\n` +
-    `- 只在非常不清楚时才追问。能推进就推进，别卡在一个问题上。\n` +
-    `- 尽量少问，多提炼。不要为了追问而追问。\n` +
-    `- 不要重复已经问过的问题；如果历史里已有相同意图，换一个更具体的新角度。\n` +
-    `- 如果信息足够，就直接 transition 到下一个话题。\n` +
-    `- 如果受访者说「没了」「就这样」「结束」「不知道了」，优先选择 end（如果话题已够）或 transition（如果还有话题）。\n` +
-    `- 如果受访者给出了值得深挖的新信息，优先选择 probe。\n` +
-    `- 如果受访者向你提问，必须先回答/解释/澄清这个问题，再提出一个新的、不同意图的后续问题；禁止只重复上一题。\n` +
-    `- 如果受访者的回答含糊、抽象或可能有歧义，先用自然语言帮助对方澄清（clarify）：复述你理解到的点 + 问一个更具体的澄清问题；不要原样重问。\n` +
-    `- 如果受访者的回答已经清楚、具体、有例子，就继续推进，不要重复确认。\n` +
-    `- 不要重复已经问过的问题；如果必须留在同一话题，也要换成更具体的新角度。\n` +
-    `- 如果当前话题已满足 min_questions 且受访者没有新信息，优先 transition。\n` +
-    `- 如果所有话题都完成，必须选择 end。`;
+  const prompt = p.interview(session, p.designContext(session), fw, state, currentTopic, nextTopicId, history, askedQuestions, userText);
   const raw = await chatProvider({
     protocol: session.protocol || session.provider,
     baseUrl: session.baseUrl,
     apiKey,
     model: session.model,
     messages: [
-      { role: 'system', content: '你是一位资深定性研究访谈主持人，擅长动态把握访谈节奏、先澄清受访者问题再推进、自然过渡话题、并在合适时机结束访谈。所有输出必须使用简体中文；不得夹杂越南语、英语或其他语言。禁止重复已问过的问题；同一话题内也必须换新角度。' },
+      { role: 'system', content: p.interviewSystem },
       { role: 'user', content: prompt },
     ],
     jsonMode: true,
@@ -305,12 +234,12 @@ async function decideNext(session, userText, apiKey) {
   try {
     const decision = JSON.parse(extractFirstJson(raw));
     const nextId = decision.next_topic_id || (decision.action === 'transition' ? getNextTopicId(fw, state.currentTopicId) : null);
-    let question = decision.question || (decision.action === 'transition' && nextId ? `我们进入「${getTopic(fw, nextId).name}」。${getTopic(fw, nextId).focus_prompt}` : raw);
-    if (decision.action === 'transition' && question.includes('继续往下聊') && nextId) {
-      question = `我们进入「${getTopic(fw, nextId).name}」。${getTopic(fw, nextId).focus_prompt}`;
+    let question = decision.question || (decision.action === 'transition' && nextId ? p.transitionFallback(getTopic(fw, nextId)) : raw);
+    if (decision.action === 'transition' && nextId && (question.includes('继续往下聊') || question.toLowerCase().includes('let\'s continue') || question.toLowerCase().includes('continue'))) {
+      question = p.transitionFallback(getTopic(fw, nextId));
     }
     if (repeatedQuestion(session, question)) {
-      question = `换一个角度说，${currentTopic.focus_prompt}`;
+      question = p.repeatFallback(currentTopic.focus_prompt);
     }
     return {
       action: decision.action || 'ask',
@@ -344,23 +273,16 @@ function updateState(session, decision) {
   state.totalTurns++;
 }
 
-async function generateReport(session, apiKey) {
-  const ctx = designContext(session);
-  const fw = session.framework;
-  const prompt = `分析以下访谈记录，输出一份结构化研究报告。\n\n` +
-    `${ctx}\n` +
-    `访谈框架：\n${fw.topics.map(t => `- ${t.name}：${t.goal}`).join('\n')}\n\n` +
-    `访谈记录：\n${transcriptText(session)}\n\n` +
-    `返回 JSON，格式如下。所有字段必须使用简体中文，不得出现越南语、英语或其他语言：\n` +
-    `{\n  "summary": "string",\n  "themes": [{"name": "string", "description": "string", "quotes": ["string"]}],\n  "insights": [{"finding": "string", "evidence": "string"}],\n  "sentiment": "string",\n  "recommendations": ["string"]\n}`;
+async function generateReport(session, apiKey, lang = 'en') {
+  const p = PROMPTS[lang] || PROMPTS.en;
   const raw = await chatProvider({
     protocol: session.protocol || session.provider,
     baseUrl: session.baseUrl,
     apiKey,
     model: session.model,
     messages: [
-      { role: 'system', content: '你是一位资深用户研究专家，擅长撰写简洁、有证据支撑的研究报告。所有输出必须使用简体中文；不得夹杂越南语、英语或其他语言。' },
-      { role: 'user', content: prompt },
+      { role: 'system', content: p.reportSystem },
+      { role: 'user', content: p.report(session, p.designContext(session), session.framework) },
     ],
     jsonMode: true,
   });
@@ -371,32 +293,16 @@ async function generateReport(session, apiKey) {
   }
 }
 
-async function evaluateConversation(session, apiKey) {
-  const ctx = designContext(session);
-  const rubric = `\n` +
-    `naturalness（自然度）: 问题是否像真人对话，不生硬。\n` +
-    `relevance（相关性）: 问题是否紧扣研究目标和当前话题。\n` +
-    `probing（追问质量）: 是否基于受访者回答做了有效追问。\n` +
-    `single_question（单一问题）: 是否一次只问一个问题。\n` +
-    `no_bias（无偏见）: 是否避免引导性或偏见性语言。\n` +
-    `progression（节奏推进）: 话题过渡是否自然，是否按框架有序推进。\n` +
-    `ending（自然结束）: 是否在合适时机主动结束，没有反复追问。\n` +
-    `persona_fit（画像契合）: 问题是否符合目标受众与受访者画像。`;
-  const prompt = `你是一位资深用户研究专家。请评估下面这段 AI 主持的访谈质量。\n\n` +
-    `${ctx}\n` +
-    `访谈框架：\n${session.framework.topics.map(t => `- ${t.name}：${t.goal}`).join('\n')}\n\n` +
-    `访谈记录：\n${transcriptText(session)}\n\n` +
-    `评估维度（1-5 分，5 分最好）：${rubric}\n\n` +
-    `返回 JSON。所有字段必须使用简体中文，不得出现越南语、英语或其他语言：\n` +
-    `{\n  "scores": {"naturalness": 1, "relevance": 1, "probing": 1, "single_question": 1, "no_bias": 1, "progression": 1, "ending": 1, "persona_fit": 1},\n  "overall_comment": "总体评价",\n  "top_strength": "最大优点",\n  "top_weakness": "最大改进点",\n  "bad_cases": [{"turn": 1, "issue": "问题"}]\n}`;
+async function evaluateConversation(session, apiKey, lang = 'en') {
+  const p = PROMPTS[lang] || PROMPTS.en;
   const raw = await chatProvider({
     protocol: session.protocol || session.provider,
     baseUrl: session.baseUrl,
     apiKey,
     model: session.model,
     messages: [
-      { role: 'system', content: '你是一位严格的访谈质量评估专家，评分客观、具体。所有输出必须使用简体中文；不得夹杂越南语、英语或其他语言。' },
-      { role: 'user', content: prompt },
+      { role: 'system', content: p.evaluateSystem },
+      { role: 'user', content: p.evaluate(session, p.designContext(session), session.framework) },
     ],
     jsonMode: true,
   });
@@ -589,7 +495,7 @@ const server = http.createServer(async (req, res) => {
       methodology: body.methodology || 'general',
     };
     try {
-      const framework = await generateFramework(design, body.apiKey, protocol, normalizeBaseUrl(protocol, body.baseUrl), body.model);
+      const framework = await generateFramework(design, body.apiKey, protocol, normalizeBaseUrl(protocol, body.baseUrl), body.model, body.lang || 'en');
       return json(res, 200, { framework });
     } catch (e) { return bad(res, e.message); }
   }
@@ -610,6 +516,7 @@ const server = http.createServer(async (req, res) => {
       methodology: body.methodology || 'general',
       protocol,
       provider: protocol,
+      lang: body.lang || 'en',
       baseUrl: normalizeBaseUrl(protocol, body.baseUrl),
       model: body.model,
       framework: body.framework,
@@ -617,7 +524,7 @@ const server = http.createServer(async (req, res) => {
       createdAt: new Date().toISOString(),
       messages: [],
     };
-    const first = await decideNext(session, null, body.apiKey);
+    const first = await decideNext(session, null, body.apiKey, body.lang || session.lang || 'en');
     updateState(session, first);
     session.messages.push({ role: 'assistant', text: first.question, action: first.action, reason: first.reason, topic_id: session.state.currentTopicId, stage: session.state.topicStage, ts: new Date().toISOString() });
     await saveSession(session);
@@ -634,7 +541,7 @@ const server = http.createServer(async (req, res) => {
     if (!body.apiKey) return bad(res, 'apiKey is required');
     if (session.state.interviewEnded) return json(res, 200, { message: '访谈已经结束，谢谢你的时间。', interviewEnded: true });
     session.messages.push({ role: 'user', text: body.text, ts: new Date().toISOString() });
-    const reply = await decideNext(session, body.text, body.apiKey);
+    const reply = await decideNext(session, body.text, body.apiKey, body.lang || session.lang || 'en');
     updateState(session, reply);
     session.messages.push({ role: 'assistant', text: reply.question, action: reply.action, reason: reply.reason, topic_id: session.state.currentTopicId, stage: session.state.topicStage, ts: new Date().toISOString() });
     await saveSession(session);
@@ -648,7 +555,8 @@ const server = http.createServer(async (req, res) => {
     if (!session) return json(res, 404, { error: 'session not found' });
     const body = JSON.parse(await readBody(req) || '{}');
     if (!body.apiKey) return bad(res, 'apiKey is required');
-    const report = await generateReport(session, body.apiKey);
+    const report = await generateReport(session, body.apiKey, body.lang || session.lang || 'en');
+
     return json(res, 200, { id, goal: session.goal, report });
   }
 
@@ -659,7 +567,8 @@ const server = http.createServer(async (req, res) => {
     if (!session) return json(res, 404, { error: 'session not found' });
     const body = JSON.parse(await readBody(req) || '{}');
     if (!body.apiKey) return bad(res, 'apiKey is required');
-    const evaluation = await evaluateConversation(session, body.apiKey);
+    const evaluation = await evaluateConversation(session, body.apiKey, body.lang || session.lang || 'en');
+
     return json(res, 200, { id, evaluation });
   }
 
