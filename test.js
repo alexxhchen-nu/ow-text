@@ -243,6 +243,22 @@ const mockProvider = http.createServer((req, res) => {
       return;
     }
 
+    if (req.url === '/hf/chat') {
+      res.writeHead(200);
+      res.end(JSON.stringify({ generated_text: JSON.stringify(decide(body)) }));
+      return;
+    }
+    if (req.url === '/hf/asr') {
+      res.writeHead(200);
+      res.end(JSON.stringify({ text: 'hf spoken answer' }));
+      return;
+    }
+    if (req.url === '/hf/tts') {
+      res.writeHead(200, { 'Content-Type': 'audio/wav' });
+      res.end(Buffer.from('hf-audio-bytes'));
+      return;
+    }
+
     if (req.url === '/v1/messages') {
       res.writeHead(200);
       res.end(JSON.stringify({ content: [{ text: JSON.stringify(decide(body)) }] }));
@@ -270,6 +286,7 @@ mockProvider.listen(3001, async () => {
   const cfg = { protocol: 'openai-compatible', baseUrl: 'http://localhost:3001/v1', apiKey: 'fake-key', model: 'mock-model' };
   const cfgAnthropic = { protocol: 'anthropic-compatible', baseUrl: 'http://localhost:3001/v1', apiKey: 'fake-key', model: 'mock-model' };
   const sttCfg = { protocol: 'openai-compatible', baseUrl: 'http://localhost:3001/v1', apiKey: 'fake-key', model: 'whisper-1' };
+  const hfCfg = { protocol: 'huggingface-task', baseUrl: 'http://localhost:3001/hf/chat', apiKey: 'hf-fake', model: 'hf-model' };
   const design = { goal: 'test goal', targetAudience: 'test audience', scenarios: 'test scenario', persona: 'test persona', methodology: 'JTBD' };
 
   const askedQuestions = [];
@@ -307,6 +324,34 @@ mockProvider.listen(3001, async () => {
     assert(ttsRes.ok && ttsRes.headers.get('content-type') === 'audio/mpeg', 'TTS should return audio');
     const ttsBuf = Buffer.from(await ttsRes.arrayBuffer());
     assert(ttsBuf.toString() === 'fake-audio-bytes', 'TTS audio bytes mismatch');
+
+    // Hugging Face task STT and TTS
+    const hfForm = new FormData();
+    hfForm.append('audio', new Blob(['fake-audio'], { type: 'audio/webm' }), 'chunk.webm');
+    hfForm.append('protocol', 'huggingface-task');
+    hfForm.append('baseUrl', 'http://localhost:3001/hf/asr');
+    hfForm.append('apiKey', hfCfg.apiKey);
+    hfForm.append('model', 'hf-asr');
+    const hfSttRes = await fetch(`${base}/api/transcribe`, { method: 'POST', body: hfForm });
+    assert(hfSttRes.ok, 'Hugging Face STT should succeed');
+    assert((await hfSttRes.json()).text === 'hf spoken answer', 'Hugging Face STT transcript failed');
+    const hfTtsRes = await fetch(`${base}/api/speak`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: 'hello', protocol: 'huggingface-task', baseUrl: 'http://localhost:3001/hf/tts', apiKey: hfCfg.apiKey, model: 'hf-tts' })
+    });
+    assert(hfTtsRes.ok && hfTtsRes.headers.get('content-type') === 'audio/wav', 'Hugging Face TTS should return audio');
+    assert(Buffer.from(await hfTtsRes.arrayBuffer()).toString() === 'hf-audio-bytes', 'Hugging Face TTS audio bytes mismatch');
+
+    // Validation errors should remain JSON, not crash the server.
+    const invalidStt = await fetch(`${base}/api/transcribe`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+    assert(invalidStt.status === 400, 'invalid STT content type should return 400');
+    const invalidTts = await fetch(`${base}/api/speak`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+    assert(invalidTts.status === 400, 'missing TTS text should return 400');
+
+    // Start interview with Hugging Face task protocol
+    const hfStart = await post(base, '/api/interview/start', { ...hfCfg, ...design, framework: fw.framework, lang: 'en' });
+    assert(hfStart.topic_id === 't1' && hfStart.action === 'ask', 'Hugging Face task chat start failed');
 
     // Start interview with anthropic-compatible protocol
     const anthStart = await post(base, '/api/interview/start', { ...cfgAnthropic, ...design, framework: fw.framework, lang: 'zh' });
