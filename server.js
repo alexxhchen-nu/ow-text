@@ -413,6 +413,84 @@ async function readBody(req) {
   return Buffer.concat(chunks).toString('utf8');
 }
 
+async function readBufferBody(req) {
+  const chunks = [];
+  for await (const chunk of req) chunks.push(chunk);
+  return Buffer.concat(chunks);
+}
+
+function parseMultipart(buf, contentType) {
+  const match = String(contentType).match(/boundary=([^;]+)/i);
+  if (!match) throw new Error('missing multipart boundary');
+  const boundary = match[1].trim().replace(/^"|"$/g, '');
+  const parts = buf.toString('binary').split('--' + boundary);
+  const fields = {};
+  const files = [];
+  for (const part of parts) {
+    const trimmed = part.replace(/\r\n$/, '');
+    if (trimmed === '' || trimmed === '--') continue;
+    const delim = '\r\n\r\n';
+    const idx = trimmed.indexOf(delim);
+    if (idx === -1) continue;
+    const headerText = trimmed.slice(0, idx);
+    const rawBody = trimmed.slice(idx + delim.length);
+    const headers = {};
+    for (const line of headerText.split('\r\n')) {
+      const colon = line.indexOf(':');
+      if (colon > -1) headers[line.slice(0, colon).toLowerCase()] = line.slice(colon + 1).trim();
+    }
+    const disp = headers['content-disposition'] || '';
+    const nameMatch = disp.match(/name="([^"]+)"/);
+    const filenameMatch = disp.match(/filename="([^"]*)"/);
+    if (!nameMatch) continue;
+    const name = nameMatch[1];
+    if (filenameMatch) {
+      files.push({ name, filename: filenameMatch[1] || 'blob', type: headers['content-type'] || 'application/octet-stream', data: Buffer.from(rawBody, 'binary') });
+    } else {
+      fields[name] = Buffer.from(rawBody, 'binary').toString('utf8');
+    }
+  }
+  return { fields, files };
+}
+
+async function transcribeAudio({ audio, protocol, baseUrl, apiKey, model, language }) {
+  if (!apiKey) throw new Error('API key is required');
+  if (!audio?.data) throw new Error('audio is required');
+  const p = protocol || 'openai-compatible';
+  if (p === 'openai-compatible') {
+    const base = normalizeBaseUrl(p, baseUrl);
+    const boundary = '----VoiceFormBoundary' + Math.random().toString(36).slice(2);
+    const parts = [];
+    parts.push(Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="audio.webm"\r\nContent-Type: ${audio.type || 'audio/webm'}\r\n\r\n`, 'utf8'));
+    parts.push(audio.data);
+    parts.push(Buffer.from(`\r\n--${boundary}\r\nContent-Disposition: form-data; name="model"\r\n\r\n${model}`, 'utf8'));
+    if (language) parts.push(Buffer.from(`\r\n--${boundary}\r\nContent-Disposition: form-data; name="language"\r\n\r\n${language}`, 'utf8'));
+    parts.push(Buffer.from(`\r\n--${boundary}--\r\n`, 'utf8'));
+    const body = Buffer.concat(parts);
+    const res = await fetch(`${base}/audio/transcriptions`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': `multipart/form-data; boundary=${boundary}` },
+      body,
+    });
+    if (!res.ok) throw new Error(`STT ${res.status}: ${await res.text()}`);
+    const text = await res.text();
+    const data = JSON.parse(extractFirstJson(text));
+    return data.text || '';
+  }
+  if (p === 'huggingface-task') {
+    const res = await fetch(baseUrl, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': audio.type || 'audio/webm' },
+      body: audio.data,
+    });
+    if (!res.ok) throw new Error(`STT ${res.status}: ${await res.text()}`);
+    const text = await res.text();
+    const data = JSON.parse(extractFirstJson(text));
+    return data.text || data.generated_text || '';
+  }
+  throw new Error(`unsupported STT protocol: ${p}`);
+}
+
 function json(res, status, data) {
   res.writeHead(status, { 'Content-Type': 'application/json' });
   res.end(JSON.stringify(data));
@@ -434,6 +512,19 @@ const server = http.createServer(async (req, res) => {
     try {
       const models = await listModels({ protocol: body.protocol || body.provider, provider: body.provider, baseUrl: body.baseUrl, apiKey: body.apiKey });
       return json(res, 200, { models });
+    } catch (e) { return bad(res, e.message); }
+  }
+
+  if (pathname === '/api/transcribe' && req.method === 'POST') {
+    const contentType = req.headers['content-type'] || '';
+    if (!contentType.includes('multipart/form-data')) return bad(res, 'expected multipart/form-data');
+    try {
+      const buf = await readBufferBody(req);
+      const { fields, files } = parseMultipart(buf, contentType);
+      const audio = files.find(f => f.name === 'audio');
+      if (!audio) return bad(res, 'audio file is required');
+      const text = await transcribeAudio({ audio, protocol: fields.protocol, baseUrl: fields.baseUrl, apiKey: fields.apiKey, model: fields.model, language: fields.language });
+      return json(res, 200, { text });
     } catch (e) { return bad(res, e.message); }
   }
 
