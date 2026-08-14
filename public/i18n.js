@@ -32,6 +32,7 @@ const I18N = {
       'openai-compatible': 'OpenAI-compatible',
       'anthropic-compatible': 'Anthropic-compatible',
       'huggingface-task': 'Hugging Face task',
+      elevenlabs: 'ElevenLabs TTS',
     },
     setup: {
       title: 'Setup',
@@ -103,6 +104,7 @@ const I18N = {
       sentiment: 'Sentiment / motivation',
       transcript: 'Transcript',
       downloadCsv: 'Download CSV',
+      downloadAll: 'Download all results',
       evaluate: 'Evaluate interview',
       newInterview: 'New interview',
       avgScore: 'Average score',
@@ -164,6 +166,7 @@ const I18N = {
       'openai-compatible': 'OpenAI 兼容',
       'anthropic-compatible': 'Anthropic 兼容',
       'huggingface-task': 'Hugging Face 任务',
+      elevenlabs: 'ElevenLabs 文字转语音',
     },
     setup: {
       title: '设置',
@@ -235,6 +238,7 @@ const I18N = {
       sentiment: '情绪 / 动机线索',
       transcript: '访谈内容',
       downloadCsv: '下载 CSV',
+      downloadAll: '下载全部结果',
       evaluate: '评估访谈',
       newInterview: '新建访谈',
       avgScore: '平均分',

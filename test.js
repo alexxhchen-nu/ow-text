@@ -196,6 +196,7 @@ function decide(body) {
 }
 
 // Mock provider server
+let elevenRequest;
 const mockProvider = http.createServer((req, res) => {
   res.setHeader('Content-Type', 'application/json');
   let body = '';
@@ -242,6 +243,12 @@ const mockProvider = http.createServer((req, res) => {
       res.end(Buffer.from('fake-audio-bytes'));
       return;
     }
+    if (req.url === '/v1/text-to-speech/test-voice/stream?output_format=mp3_44100_128') {
+      elevenRequest = { headers: req.headers, body: JSON.parse(body) };
+      res.writeHead(200, { 'Content-Type': 'audio/mpeg' });
+      res.end(Buffer.from('eleven-audio-bytes'));
+      return;
+    }
 
     if (req.url === '/hf/chat') {
       res.writeHead(200);
@@ -275,6 +282,12 @@ function assert(cond, msg) {
 async function post(base, path, body) {
   const res = await fetch(`${base}${path}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
   if (!res.ok) throw new Error(`POST ${path} failed ${res.status}: ${await res.text()}`);
+  return res.json();
+}
+
+async function getJson(base, path) {
+  const res = await fetch(`${base}${path}`);
+  if (!res.ok) throw new Error(`GET ${path} failed ${res.status}: ${await res.text()}`);
   return res.json();
 }
 
@@ -324,6 +337,18 @@ mockProvider.listen(3001, async () => {
     assert(ttsRes.ok && ttsRes.headers.get('content-type') === 'audio/mpeg', 'TTS should return audio');
     const ttsBuf = Buffer.from(await ttsRes.arrayBuffer());
     assert(ttsBuf.toString() === 'fake-audio-bytes', 'TTS audio bytes mismatch');
+
+    const elevenTtsRes = await fetch(`${base}/api/speak`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: '你好 world', protocol: 'elevenlabs', baseUrl: 'http://localhost:3001/v1', apiKey: 'eleven-key', model: 'eleven_multilingual_v2', voice: 'test-voice', speed: '1.15' })
+    });
+    assert(elevenTtsRes.ok && elevenTtsRes.headers.get('content-type') === 'audio/mpeg', 'ElevenLabs TTS should return audio');
+    assert(Buffer.from(await elevenTtsRes.arrayBuffer()).toString() === 'eleven-audio-bytes', 'ElevenLabs TTS audio bytes mismatch');
+    assert(elevenRequest?.headers['xi-api-key'] === 'eleven-key', 'ElevenLabs should use xi-api-key header');
+    assert(elevenRequest?.body?.text === '你好 world', 'ElevenLabs should send text body');
+    assert(elevenRequest?.body?.model_id === 'eleven_multilingual_v2', 'ElevenLabs should send model_id');
+    assert(elevenRequest?.body?.voice_settings?.speed === 1.15, 'ElevenLabs should send voice_settings.speed');
 
     // Hugging Face task STT and TTS
     const hfForm = new FormData();
@@ -429,6 +454,16 @@ mockProvider.listen(3001, async () => {
     // Evaluate conversation
     const evaluation = await post(base, `/api/interview/${start.id}/evaluate`, { apiKey: cfg.apiKey, lang: 'zh' });
     assert(evaluation.evaluation.overall_comment === 'mock overall comment', 'evaluate failed');
+
+    const exported = await getJson(base, `/api/interview/${start.id}/export`);
+    assert(exported.id === start.id, 'export id failed');
+    assert(exported.goal === 'test goal', 'export goal failed');
+    assert(Array.isArray(exported.messages) && exported.messages.length >= 3, 'export messages missing');
+    assert(Array.isArray(exported.qaPairs) && exported.qaPairs.length >= 1, 'export qaPairs missing');
+    assert(typeof exported.transcript === 'string' && exported.transcript.includes('主持人'), 'export transcript missing');
+    assert(exported.report?.summary === 'mock summary', 'export report missing');
+    assert(exported.evaluation?.overall_comment === 'mock overall comment', 'export evaluation missing');
+    assert(exported.qaPairs[0].question && Object.hasOwn(exported.qaPairs[0], 'answer'), 'export qaPairs shape invalid');
 
     console.log('All checks passed');
   } catch (e) {

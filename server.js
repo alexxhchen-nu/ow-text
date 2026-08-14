@@ -198,6 +198,53 @@ function getNextTopicId(framework, currentTopicId) {
   return null;
 }
 
+function buildQaPairs(messages) {
+  const pairs = [];
+  for (let i = 0; i < messages.length; i++) {
+    if (messages[i].role !== 'assistant') continue;
+    const next = messages[i + 1]?.role === 'user' ? messages[i + 1] : null;
+    pairs.push({
+      index: pairs.length + 1,
+      question: messages[i].text,
+      answer: next?.text || '',
+      questionMeta: {
+        action: messages[i].action || '',
+        reason: messages[i].reason || '',
+        topic_id: messages[i].topic_id || '',
+        stage: messages[i].stage || '',
+        ts: messages[i].ts || '',
+      },
+      answerMeta: next ? { ts: next.ts || '' } : null,
+    });
+    if (next) i++;
+  }
+  return pairs;
+}
+
+function exportSession(session) {
+  const lang = session.lang || 'en';
+  return {
+    id: session.id,
+    goal: session.goal,
+    lang,
+    methodology: session.methodology || 'general',
+    targetAudience: session.targetAudience || '',
+    scenarios: session.scenarios || '',
+    persona: session.persona || '',
+    protocol: session.protocol || session.provider || '',
+    baseUrl: session.baseUrl || '',
+    model: session.model || '',
+    createdAt: session.createdAt || '',
+    framework: session.framework || null,
+    state: session.state || null,
+    messages: session.messages || [],
+    qaPairs: buildQaPairs(session.messages || []),
+    transcript: transcriptText(session, lang),
+    report: session.lastReport || null,
+    evaluation: session.lastEvaluation || null,
+  };
+}
+
 function repeatedQuestion(session, text) {
   const norm = s => String(s).replace(/[\s。？！?！,.，]/g, '');
   const current = norm(text);
@@ -375,8 +422,25 @@ async function speakText({ text, protocol, baseUrl, apiKey, model, voice, speed 
     if (!res.ok) throw new Error(`TTS ${res.status}: ${await res.text()}`);
     return { body: res.body, contentType: res.headers.get('content-type') || 'audio/mpeg' };
   }
-  if (p === 'huggingface-task') {
-    const body = { inputs: text, parameters: { voice, speed } };
+    if (p === 'elevenlabs') {
+      if (!voice) throw new Error('ElevenLabs voice ID is required');
+      const base = (baseUrl || 'https://api.elevenlabs.io').replace(/\/v1\/?$/, '').replace(/\/$/, '');
+      const body = { text, model_id: model || 'eleven_multilingual_v2' };
+      if (speed !== undefined && speed !== '') {
+        const value = Number(speed);
+        if (!Number.isFinite(value)) throw new Error('ElevenLabs speed must be a number');
+        body.voice_settings = { speed: value };
+      }
+      const res = await fetch(`${base}/v1/text-to-speech/${encodeURIComponent(voice)}/stream?output_format=mp3_44100_128`, {
+        method: 'POST',
+        headers: { 'xi-api-key': apiKey, 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) throw new Error(`ElevenLabs TTS ${res.status}: ${await res.text()}`);
+      return { body: res.body, contentType: res.headers.get('content-type') || 'audio/mpeg' };
+    }
+    if (p === 'huggingface-task') {
+      const body = { inputs: text, parameters: { voice, speed } };
     const res = await fetch(baseUrl, {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
@@ -556,6 +620,8 @@ const server = http.createServer(async (req, res) => {
     const body = JSON.parse(await readBody(req) || '{}');
     if (!body.apiKey) return bad(res, 'apiKey is required');
     const report = await generateReport(session, body.apiKey, body.lang || session.lang || 'en');
+    session.lastReport = report;
+    await saveSession(session);
 
     return json(res, 200, { id, goal: session.goal, report });
   }
@@ -568,8 +634,17 @@ const server = http.createServer(async (req, res) => {
     const body = JSON.parse(await readBody(req) || '{}');
     if (!body.apiKey) return bad(res, 'apiKey is required');
     const evaluation = await evaluateConversation(session, body.apiKey, body.lang || session.lang || 'en');
+    session.lastEvaluation = evaluation;
+    await saveSession(session);
 
     return json(res, 200, { id, evaluation });
+  }
+
+  const exportMatch = pathname.match(/^\/api\/interview\/([^/]+)\/export$/);
+  if (exportMatch && req.method === 'GET') {
+    const session = await loadSession(exportMatch[1]);
+    if (!session) return json(res, 404, { error: 'session not found' });
+    return json(res, 200, exportSession(session));
   }
 
   const sessionMatch = pathname.match(/^\/api\/interview\/([^/]+)$/);
