@@ -184,7 +184,7 @@ const mockProvider = http.createServer((req, res) => {
     }
     if (req.url === '/v1/messages') {
       res.writeHead(200);
-      res.end(JSON.stringify({ content: [{ text: 'mock-anthropic-reply' }] }));
+      res.end(JSON.stringify({ content: [{ text: JSON.stringify(decide(body)) }] }));
       return;
     }
     res.writeHead(404); res.end('{}');
@@ -206,7 +206,8 @@ mockProvider.listen(3001, async () => {
   await new Promise(r => setTimeout(r, 800));
 
   const base = 'http://localhost:3002';
-  const cfg = { provider: 'openai', baseUrl: 'http://localhost:3001/v1/chat/completions', apiKey: 'fake-key', model: 'mock-model' };
+  const cfg = { protocol: 'openai-compatible', baseUrl: 'http://localhost:3001/v1', apiKey: 'fake-key', model: 'mock-model' };
+  const cfgAnthropic = { protocol: 'anthropic-compatible', baseUrl: 'http://localhost:3001/v1', apiKey: 'fake-key', model: 'mock-model' };
   const design = { goal: 'test goal', targetAudience: 'test audience', scenarios: 'test scenario', persona: 'test persona', methodology: 'JTBD' };
 
   const askedQuestions = [];
@@ -223,7 +224,12 @@ mockProvider.listen(3001, async () => {
     const fw = await post(base, '/api/interview/framework', { ...cfg, ...design });
     assert(fw.framework.topics.length === 4, 'framework generation failed');
 
-    // Start interview
+    // Start interview with anthropic-compatible protocol
+    const anthStart = await post(base, '/api/interview/start', { ...cfgAnthropic, ...design, framework: fw.framework });
+    assert(anthStart.topic_id === 't1', 'anthropic-compatible start topic_id failed');
+    assert(anthStart.action === 'ask', 'anthropic-compatible start action should be ask');
+
+    // Start interview with openai-compatible protocol
     const start = await post(base, '/api/interview/start', { ...cfg, ...design, framework: fw.framework });
     assert(start.topic_id === 't1', 'start topic_id failed');
     assert(start.action === 'ask', 'start action should be ask');

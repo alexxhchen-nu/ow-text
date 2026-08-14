@@ -30,9 +30,10 @@ async function saveSession(session) {
   await fs.writeFile(path.join(DATA_DIR, `${session.id}.json`), JSON.stringify(session, null, 2));
 }
 
-function normalizeBaseUrl(provider, baseUrl) {
-  if (baseUrl) return baseUrl.replace(/\/(chat\/completions|messages|models)\/?$/, '').replace(/\/$/, '');
-  return DEFAULT_BASE_URLS[provider] || '';
+function normalizeBaseUrl(protocol, baseUrl) {
+  if (baseUrl) return baseUrl.replace(/\/(chat\/completions|messages|models|audio\/transcriptions|audio\/speech)\/?$/, '').replace(/\/$/, '');
+  const legacy = protocol === 'anthropic' || protocol === 'anthropic-compatible' ? 'anthropic' : 'openai';
+  return DEFAULT_BASE_URLS[legacy] || '';
 }
 
 function extractFirstJson(text) {
@@ -55,11 +56,12 @@ function extractFirstJson(text) {
   throw new Error('No valid JSON found in response');
 }
 
-async function listModels({ provider, baseUrl, apiKey }) {
+async function listModels({ protocol, provider, baseUrl, apiKey }) {
   if (!apiKey) throw new Error('API key is required');
-  const url = `${normalizeBaseUrl(provider, baseUrl)}/models`;
+  const p = protocol || provider || 'openai-compatible';
+  const url = `${normalizeBaseUrl(p, baseUrl)}/models`;
   const headers = { 'Content-Type': 'application/json' };
-  if (provider === 'anthropic') {
+  if (p === 'anthropic' || p === 'anthropic-compatible') {
     headers['x-api-key'] = apiKey;
     headers['anthropic-version'] = '2023-06-01';
   } else {
@@ -87,15 +89,16 @@ function splitSystem(messages) {
   return { system, chat };
 }
 
-async function providerChat({ provider, baseUrl, apiKey, model, messages, jsonMode = false }) {
+async function chatProvider({ protocol, provider, baseUrl, apiKey, model, messages, jsonMode = false, max_tokens = 4096 }) {
   if (!apiKey) throw new Error('API key is required');
-  const base = normalizeBaseUrl(provider, baseUrl);
+  const p = protocol || provider || 'openai-compatible';
+  const base = normalizeBaseUrl(p, baseUrl);
   if (!base) throw new Error('Provider base URL is required');
   try {
     if (!model) throw new Error('model is required');
-    if (provider === 'anthropic') {
+    if (p === 'anthropic' || p === 'anthropic-compatible') {
       const { system, chat } = splitSystem(messages);
-      const body = { model, messages: chat, max_tokens: 4096, system: system + (jsonMode ? '\nRespond only with valid JSON.' : '') };
+      const body = { model, messages: chat, max_tokens, system: system + (jsonMode ? '\nRespond only with valid JSON.' : '') };
       const res = await fetch(`${base}/messages`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
@@ -106,7 +109,24 @@ async function providerChat({ provider, baseUrl, apiKey, model, messages, jsonMo
       const data = JSON.parse(extractFirstJson(text));
       return data.content?.[0]?.text ?? '';
     }
+    if (p === 'huggingface-task') {
+      const isChatCompletion = base.endsWith('/chat/completions');
+      const body = isChatCompletion
+        ? { model, messages, max_tokens, temperature: 0.7 }
+        : { inputs: lastUserContent(messages) };
+      const res = await fetch(base, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) throw new Error(`Hugging Face ${res.status}: ${await res.text()}`);
+      const text = await res.text();
+      const data = JSON.parse(extractFirstJson(text));
+      if (isChatCompletion) return data.choices?.[0]?.message?.content ?? '';
+      return data.generated_text ?? data.text ?? data[0]?.generated_text ?? data[0]?.text ?? '';
+    }
     const body = { model, messages };
+    if (max_tokens) body.max_tokens = max_tokens;
     if (jsonMode) body.response_format = { type: 'json_object' };
     const res = await fetch(`${base}/chat/completions`, {
       method: 'POST',
@@ -120,6 +140,13 @@ async function providerChat({ provider, baseUrl, apiKey, model, messages, jsonMo
   } catch (e) {
     throw new Error(`Provider ${base} unreachable: ${e.message}${e.cause ? ` (${e.cause.message})` : ''}`);
   }
+}
+
+function lastUserContent(messages) {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    if (messages[i].role === 'user') return messages[i].content;
+  }
+  return '';
 }
 
 function designContext(design) {
@@ -140,7 +167,7 @@ function validateFramework(fw) {
   return true;
 }
 
-async function generateFramework(design, apiKey, provider, baseUrl, model) {
+async function generateFramework(design, apiKey, protocol, baseUrl, model) {
   const ctx = designContext(design);
   const prompt = `你是一位资深用户研究设计师。请根据下面的研究设计，生成一份结构化访谈框架。\n\n` +
     `${ctx}\n\n` +
@@ -150,8 +177,8 @@ async function generateFramework(design, apiKey, provider, baseUrl, model) {
     `- 提供 3-5 条自然结束标准。\n` +
     `- 输出必须是 JSON，格式如下：\n` +
     `{\n  "topics": [{\n    "id": "t1",\n    "name": "string",\n    "goal": "string",\n    "stage": "introduce",\n    "min_questions": 2,\n    "max_questions": 5,\n    "focus_prompt": "string"\n  }],\n  "endingCriteria": ["string"],\n  "estimatedTurns": 12\n}`;
-  const raw = await providerChat({
-    provider, baseUrl, apiKey, model,
+  const raw = await chatProvider({
+    protocol, baseUrl, apiKey, model,
     messages: [
       { role: 'system', content: '你是一位资深用户研究设计师，擅长把研究目标拆成可执行、可追踪的访谈话题。所有输出必须使用简体中文；不得夹杂其他语言。' },
       { role: 'user', content: prompt },
@@ -264,8 +291,8 @@ async function decideNext(session, userText, apiKey) {
     `- 不要重复已经问过的问题；如果必须留在同一话题，也要换成更具体的新角度。\n` +
     `- 如果当前话题已满足 min_questions 且受访者没有新信息，优先 transition。\n` +
     `- 如果所有话题都完成，必须选择 end。`;
-  const raw = await providerChat({
-    provider: session.provider,
+  const raw = await chatProvider({
+    protocol: session.protocol || session.provider,
     baseUrl: session.baseUrl,
     apiKey,
     model: session.model,
@@ -326,8 +353,8 @@ async function generateReport(session, apiKey) {
     `访谈记录：\n${transcriptText(session)}\n\n` +
     `返回 JSON，格式如下。所有字段必须使用简体中文，不得出现越南语、英语或其他语言：\n` +
     `{\n  "summary": "string",\n  "themes": [{"name": "string", "description": "string", "quotes": ["string"]}],\n  "insights": [{"finding": "string", "evidence": "string"}],\n  "sentiment": "string",\n  "recommendations": ["string"]\n}`;
-  const raw = await providerChat({
-    provider: session.provider,
+  const raw = await chatProvider({
+    protocol: session.protocol || session.provider,
     baseUrl: session.baseUrl,
     apiKey,
     model: session.model,
@@ -362,8 +389,8 @@ async function evaluateConversation(session, apiKey) {
     `评估维度（1-5 分，5 分最好）：${rubric}\n\n` +
     `返回 JSON。所有字段必须使用简体中文，不得出现越南语、英语或其他语言：\n` +
     `{\n  "scores": {"naturalness": 1, "relevance": 1, "probing": 1, "single_question": 1, "no_bias": 1, "progression": 1, "ending": 1, "persona_fit": 1},\n  "overall_comment": "总体评价",\n  "top_strength": "最大优点",\n  "top_weakness": "最大改进点",\n  "bad_cases": [{"turn": 1, "issue": "问题"}]\n}`;
-  const raw = await providerChat({
-    provider: session.provider,
+  const raw = await chatProvider({
+    protocol: session.protocol || session.provider,
     baseUrl: session.baseUrl,
     apiKey,
     model: session.model,
@@ -405,7 +432,7 @@ const server = http.createServer(async (req, res) => {
   if (pathname === '/api/models' && req.method === 'POST') {
     const body = JSON.parse(await readBody(req) || '{}');
     try {
-      const models = await listModels({ provider: body.provider, baseUrl: body.baseUrl, apiKey: body.apiKey });
+      const models = await listModels({ protocol: body.protocol || body.provider, provider: body.provider, baseUrl: body.baseUrl, apiKey: body.apiKey });
       return json(res, 200, { models });
     } catch (e) { return bad(res, e.message); }
   }
@@ -413,7 +440,8 @@ const server = http.createServer(async (req, res) => {
   if (pathname === '/api/interview/framework' && req.method === 'POST') {
     const body = JSON.parse(await readBody(req) || '{}');
     if (!body.goal?.trim()) return bad(res, 'goal is required');
-    if (!body.provider || !body.apiKey || !body.model) return bad(res, 'provider, apiKey, model are required');
+    const protocol = body.protocol || body.provider;
+    if (!protocol || !body.apiKey || !body.model) return bad(res, 'protocol/provider, apiKey, model are required');
     const design = {
       goal: body.goal,
       targetAudience: body.targetAudience || '',
@@ -422,7 +450,7 @@ const server = http.createServer(async (req, res) => {
       methodology: body.methodology || 'general',
     };
     try {
-      const framework = await generateFramework(design, body.apiKey, body.provider, normalizeBaseUrl(body.provider, body.baseUrl), body.model);
+      const framework = await generateFramework(design, body.apiKey, protocol, normalizeBaseUrl(protocol, body.baseUrl), body.model);
       return json(res, 200, { framework });
     } catch (e) { return bad(res, e.message); }
   }
@@ -430,7 +458,8 @@ const server = http.createServer(async (req, res) => {
   if (pathname === '/api/interview/start' && req.method === 'POST') {
     const body = JSON.parse(await readBody(req) || '{}');
     if (!body.goal?.trim()) return bad(res, 'goal is required');
-    if (!body.provider || !body.apiKey || !body.model) return bad(res, 'provider, apiKey, model are required');
+    const protocol = body.protocol || body.provider;
+    if (!protocol || !body.apiKey || !body.model) return bad(res, 'protocol/provider, apiKey, model are required');
     if (!body.framework || !validateFramework(body.framework)) return bad(res, 'framework is required');
     const id = crypto.randomUUID();
     const session = {
@@ -440,8 +469,9 @@ const server = http.createServer(async (req, res) => {
       scenarios: body.scenarios || '',
       persona: body.persona || '',
       methodology: body.methodology || 'general',
-      provider: body.provider,
-      baseUrl: normalizeBaseUrl(body.provider, body.baseUrl),
+      protocol,
+      provider: protocol,
+      baseUrl: normalizeBaseUrl(protocol, body.baseUrl),
       model: body.model,
       framework: body.framework,
       state: initState(body.framework),
