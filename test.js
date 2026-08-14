@@ -182,6 +182,11 @@ const mockProvider = http.createServer((req, res) => {
       res.end(JSON.stringify({ choices: [{ message: { content } }] }) + 'data: [DONE]');
       return;
     }
+    if (req.url === '/v1/audio/transcriptions') {
+      res.writeHead(200);
+      res.end(JSON.stringify({ text: 'spoken answer' }));
+      return;
+    }
     if (req.url === '/v1/messages') {
       res.writeHead(200);
       res.end(JSON.stringify({ content: [{ text: JSON.stringify(decide(body)) }] }));
@@ -208,6 +213,7 @@ mockProvider.listen(3001, async () => {
   const base = 'http://localhost:3002';
   const cfg = { protocol: 'openai-compatible', baseUrl: 'http://localhost:3001/v1', apiKey: 'fake-key', model: 'mock-model' };
   const cfgAnthropic = { protocol: 'anthropic-compatible', baseUrl: 'http://localhost:3001/v1', apiKey: 'fake-key', model: 'mock-model' };
+  const sttCfg = { protocol: 'openai-compatible', baseUrl: 'http://localhost:3001/v1', apiKey: 'fake-key', model: 'whisper-1' };
   const design = { goal: 'test goal', targetAudience: 'test audience', scenarios: 'test scenario', persona: 'test persona', methodology: 'JTBD' };
 
   const askedQuestions = [];
@@ -223,6 +229,18 @@ mockProvider.listen(3001, async () => {
     // Generate framework
     const fw = await post(base, '/api/interview/framework', { ...cfg, ...design });
     assert(fw.framework.topics.length === 4, 'framework generation failed');
+
+    // STT transcription
+    const form = new FormData();
+    form.append('audio', new Blob(['fake-audio'], { type: 'audio/webm' }), 'chunk.webm');
+    form.append('protocol', sttCfg.protocol);
+    form.append('baseUrl', sttCfg.baseUrl);
+    form.append('apiKey', sttCfg.apiKey);
+    form.append('model', sttCfg.model);
+    const sttRes = await fetch(`${base}/api/transcribe`, { method: 'POST', body: form });
+    if (!sttRes.ok) throw new Error(`STT failed ${sttRes.status}: ${await sttRes.text()}`);
+    const sttData = await sttRes.json();
+    assert(sttData.text === 'spoken answer', 'STT should return transcript');
 
     // Start interview with anthropic-compatible protocol
     const anthStart = await post(base, '/api/interview/start', { ...cfgAnthropic, ...design, framework: fw.framework });
