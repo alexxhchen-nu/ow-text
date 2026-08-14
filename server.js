@@ -453,6 +453,35 @@ function parseMultipart(buf, contentType) {
   return { fields, files };
 }
 
+async function speakText({ text, protocol, baseUrl, apiKey, model, voice, speed }) {
+  if (!apiKey) throw new Error('API key is required');
+  if (!text) throw new Error('text is required');
+  const p = protocol || 'openai-compatible';
+  if (p === 'openai-compatible') {
+    const base = normalizeBaseUrl(p, baseUrl);
+    const body = { model, input: text, voice: voice || 'alloy' };
+    if (speed) body.speed = Number(speed);
+    const res = await fetch(`${base}/audio/speech`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) throw new Error(`TTS ${res.status}: ${await res.text()}`);
+    return { body: res.body, contentType: res.headers.get('content-type') || 'audio/mpeg' };
+  }
+  if (p === 'huggingface-task') {
+    const body = { inputs: text, parameters: { voice, speed } };
+    const res = await fetch(baseUrl, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) throw new Error(`TTS ${res.status}: ${await res.text()}`);
+    return { body: res.body, contentType: res.headers.get('content-type') || 'audio/wav' };
+  }
+  throw new Error(`unsupported TTS protocol: ${p}`);
+}
+
 async function transcribeAudio({ audio, protocol, baseUrl, apiKey, model, language }) {
   if (!apiKey) throw new Error('API key is required');
   if (!audio?.data) throw new Error('audio is required');
@@ -525,6 +554,25 @@ const server = http.createServer(async (req, res) => {
       if (!audio) return bad(res, 'audio file is required');
       const text = await transcribeAudio({ audio, protocol: fields.protocol, baseUrl: fields.baseUrl, apiKey: fields.apiKey, model: fields.model, language: fields.language });
       return json(res, 200, { text });
+    } catch (e) { return bad(res, e.message); }
+  }
+
+  if (pathname === '/api/speak' && req.method === 'POST') {
+    const body = JSON.parse(await readBody(req) || '{}');
+    if (!body.text) return bad(res, 'text is required');
+    try {
+      const { body: stream, contentType } = await speakText({ text: body.text, protocol: body.protocol, baseUrl: body.baseUrl, apiKey: body.apiKey, model: body.model, voice: body.voice, speed: body.speed });
+      res.writeHead(200, { 'Content-Type': contentType, 'Content-Disposition': 'inline' });
+      if (stream) {
+        const reader = stream.getReader();
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          res.write(Buffer.from(value));
+        }
+      }
+      res.end();
+      return;
     } catch (e) { return bad(res, e.message); }
   }
 

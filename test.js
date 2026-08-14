@@ -187,6 +187,12 @@ const mockProvider = http.createServer((req, res) => {
       res.end(JSON.stringify({ text: 'spoken answer' }));
       return;
     }
+    if (req.url === '/v1/audio/speech') {
+      res.writeHead(200, { 'Content-Type': 'audio/mpeg' });
+      res.end(Buffer.from('fake-audio-bytes'));
+      return;
+    }
+
     if (req.url === '/v1/messages') {
       res.writeHead(200);
       res.end(JSON.stringify({ content: [{ text: JSON.stringify(decide(body)) }] }));
@@ -241,6 +247,16 @@ mockProvider.listen(3001, async () => {
     if (!sttRes.ok) throw new Error(`STT failed ${sttRes.status}: ${await sttRes.text()}`);
     const sttData = await sttRes.json();
     assert(sttData.text === 'spoken answer', 'STT should return transcript');
+
+    // TTS synthesis
+    const ttsRes = await fetch(`${base}/api/speak`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: 'hello', protocol: 'openai-compatible', baseUrl: 'http://localhost:3001/v1', apiKey: 'fake-key', model: 'tts-1', voice: 'alloy' })
+    });
+    assert(ttsRes.ok && ttsRes.headers.get('content-type') === 'audio/mpeg', 'TTS should return audio');
+    const ttsBuf = Buffer.from(await ttsRes.arrayBuffer());
+    assert(ttsBuf.toString() === 'fake-audio-bytes', 'TTS audio bytes mismatch');
 
     // Start interview with anthropic-compatible protocol
     const anthStart = await post(base, '/api/interview/start', { ...cfgAnthropic, ...design, framework: fw.framework });
