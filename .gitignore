@@ -1,4 +1,5 @@
-# OW Text local interview data
+# OW Text local interview data and baked-in secrets
+config.js
 data/
 
 # Byte-compiled / optimized / DLL files

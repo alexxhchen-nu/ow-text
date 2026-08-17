@@ -4,6 +4,7 @@ import path from 'path';
 import crypto from 'crypto';
 import { fileURLToPath } from 'url';
 import { PROMPTS, transcriptText, getTopicName } from './prompts.js';
+import { CONFIG } from './config.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = path.join(__dirname, 'data');
@@ -35,6 +36,137 @@ function normalizeBaseUrl(protocol, baseUrl) {
   if (baseUrl) return baseUrl.replace(/\/(chat\/completions|messages|models|audio\/transcriptions|audio\/speech)\/?$/, '').replace(/\/$/, '');
   const legacy = protocol === 'anthropic' || protocol === 'anthropic-compatible' ? 'anthropic' : 'openai';
   return DEFAULT_BASE_URLS[legacy] || '';
+}
+
+let currentChat = null;
+let currentStt = null;
+let currentTts = null;
+let discoveredChat = null;
+let discoveredStt = null;
+let discoveredTts = null;
+
+function preferenceScore(id, preferences) {
+  const pid = String(id).toLowerCase();
+  for (let i = 0; i < preferences.length; i++) {
+    const pref = String(preferences[i]).toLowerCase();
+    if (pid === pref) return i;
+    if (pid.startsWith(pref)) return preferences.length + i;
+    if (pid.includes(pref)) return preferences.length * 2 + i;
+  }
+  return preferences.length * 10;
+}
+
+function isChatModel(id, meta) {
+  const endpoints = meta?.supported_endpoint_types;
+  if (endpoints) {
+    if (!endpoints.includes('openai')) return false;
+    if (endpoints.includes('image-generation')) return false;
+    if (endpoints.includes('openai-video')) return false;
+  }
+  const nonChat = /tts|asr|audio|whisper|embed|image|dall|safety|reward|parse|ocr|inkling|zamba|nv-embed|nvclip|vila|riva|wan|glm/i;
+  if (nonChat.test(id)) return false;
+  return true;
+}
+
+function isSttModel(id) { return /asr|whisper/i.test(id) && !/tts/i.test(id); }
+function isTtsModel(id) { return /tts/i.test(id) && !/asr/i.test(id); }
+
+async function discoverCandidates(serviceConfig, filterFn, preferences, limit = 20) {
+  const all = [];
+  for (const provider of serviceConfig.providers) {
+    try {
+      const models = await listModels(provider);
+      for (const m of models) {
+        if (!filterFn(m.id, m)) continue;
+        const score = preferenceScore(m.id, preferences);
+        all.push({ ...provider, model: m.id, score });
+      }
+    } catch (e) {
+      console.error(`Provider ${provider.baseUrl} discovery failed: ${e.message}`);
+    }
+  }
+  all.sort((a, b) => a.score - b.score);
+  return all.slice(0, limit);
+}
+
+async function ensureChatCandidates() {
+  if (!discoveredChat) {
+    discoveredChat = await discoverCandidates(CONFIG.chat, isChatModel, CONFIG.chat.preferences, 20);
+  }
+  return discoveredChat;
+}
+
+async function ensureSttCandidates() {
+  if (!discoveredStt) {
+    discoveredStt = await discoverCandidates(CONFIG.stt, isSttModel, CONFIG.stt.preferences, 10);
+  }
+  return discoveredStt;
+}
+
+async function ensureTtsCandidates() {
+  if (!discoveredTts) {
+    const prefs = CONFIG.tts.preferences.map(p => p.model);
+    discoveredTts = (await discoverCandidates(CONFIG.tts, isTtsModel, prefs, 10)).map(c => {
+      const exact = CONFIG.tts.preferences.find(p => p.model === c.model);
+      const prefix = CONFIG.tts.preferences.find(p => c.model.startsWith(p.model));
+      return { ...c, ...(exact || prefix || {}) };
+    });
+  }
+  return discoveredTts;
+}
+
+function candidateAttempts(current, list) {
+  const out = current ? [current] : [];
+  for (const c of list) {
+    if (!out.some(x => x.baseUrl === c.baseUrl && x.model === c.model && (x.voice ?? '') === (c.voice ?? ''))) out.push(c);
+  }
+  return out;
+}
+
+async function chatWithFallback({ messages, jsonMode = false, max_tokens = 4096 }) {
+  const candidates = await ensureChatCandidates();
+  const attempts = candidateAttempts(currentChat, candidates);
+  if (!attempts.length) throw new Error('No chat models discovered. Check providers in config.js.');
+  let lastErr;
+  for (const cand of attempts) {
+    try {
+      const text = await chatProvider({ protocol: cand.protocol, baseUrl: cand.baseUrl, apiKey: cand.apiKey, model: cand.model, messages, jsonMode, max_tokens });
+      currentChat = cand;
+      return text;
+    } catch (e) { lastErr = e; }
+  }
+  throw lastErr || new Error('All chat models failed');
+}
+
+async function transcribeWithFallback(audio) {
+  const candidates = await ensureSttCandidates();
+  const attempts = candidateAttempts(currentStt, candidates);
+  if (!attempts.length) throw new Error('No STT models discovered. Check providers in config.js.');
+  let lastErr;
+  for (const cand of attempts) {
+    try {
+      const text = await transcribeAudio({ audio, protocol: cand.protocol, baseUrl: cand.baseUrl, apiKey: cand.apiKey, model: cand.model, language: CONFIG.stt.language });
+      currentStt = cand;
+      return text;
+    } catch (e) { lastErr = e; }
+  }
+  throw lastErr || new Error('All STT models failed');
+}
+
+async function speakWithFallback(text) {
+  const candidates = await ensureTtsCandidates();
+  const attempts = candidateAttempts(currentTts, candidates);
+  if (!attempts.length) throw new Error('No TTS models discovered. Check providers in config.js.');
+  let lastErr;
+  for (const cand of attempts) {
+    try {
+      const speed = cand.speed ?? CONFIG.tts.speed;
+      const result = await speakText({ text, protocol: cand.protocol, baseUrl: cand.baseUrl, apiKey: cand.apiKey, model: cand.model, voice: cand.voice, speed });
+      currentTts = cand;
+      return result;
+    } catch (e) { lastErr = e; }
+  }
+  throw lastErr || new Error('All TTS models failed');
 }
 
 function extractFirstJson(text) {
@@ -158,11 +290,10 @@ function validateFramework(fw) {
   return true;
 }
 
-async function generateFramework(design, apiKey, protocol, baseUrl, model, lang = 'en') {
+async function generateFramework(design, lang = 'en') {
   const p = PROMPTS[lang] || PROMPTS.en;
   const ctx = p.designContext(design);
-  const raw = await chatProvider({
-    protocol, baseUrl, apiKey, model,
+  const raw = await chatWithFallback({
     messages: [
       { role: 'system', content: p.frameworkSystem },
       { role: 'user', content: p.framework(ctx) },
@@ -251,7 +382,7 @@ function repeatedQuestion(session, text) {
   return current && session.messages.some(m => m.role === 'assistant' && norm(m.text) === current);
 }
 
-async function decideNext(session, userText, apiKey, lang = 'en') {
+async function decideNext(session, userText, lang = 'en') {
   const p = PROMPTS[lang] || PROMPTS.en;
   if (session.state.interviewEnded) {
     return { action: 'end', question: p.fallbackEnd, reason: 'already ended', next_topic_id: null, next_stage: null };
@@ -267,11 +398,7 @@ async function decideNext(session, userText, apiKey, lang = 'en') {
     .slice(-8)
     .join('\n');
   const prompt = p.interview(session, p.designContext(session), fw, state, currentTopic, nextTopicId, history, askedQuestions, userText);
-  const raw = await chatProvider({
-    protocol: session.protocol || session.provider,
-    baseUrl: session.baseUrl,
-    apiKey,
-    model: session.model,
+  const raw = await chatWithFallback({
     messages: [
       { role: 'system', content: p.interviewSystem },
       { role: 'user', content: prompt },
@@ -320,13 +447,9 @@ function updateState(session, decision) {
   state.totalTurns++;
 }
 
-async function generateReport(session, apiKey, lang = 'en') {
+async function generateReport(session, lang = 'en') {
   const p = PROMPTS[lang] || PROMPTS.en;
-  const raw = await chatProvider({
-    protocol: session.protocol || session.provider,
-    baseUrl: session.baseUrl,
-    apiKey,
-    model: session.model,
+  const raw = await chatWithFallback({
     messages: [
       { role: 'system', content: p.reportSystem },
       { role: 'user', content: p.report(session, p.designContext(session), session.framework) },
@@ -340,13 +463,9 @@ async function generateReport(session, apiKey, lang = 'en') {
   }
 }
 
-async function evaluateConversation(session, apiKey, lang = 'en') {
+async function evaluateConversation(session, lang = 'en') {
   const p = PROMPTS[lang] || PROMPTS.en;
-  const raw = await chatProvider({
-    protocol: session.protocol || session.provider,
-    baseUrl: session.baseUrl,
-    apiKey,
-    model: session.model,
+  const raw = await chatWithFallback({
     messages: [
       { role: 'system', content: p.evaluateSystem },
       { role: 'user', content: p.evaluate(session, p.designContext(session), session.framework) },
@@ -412,8 +531,9 @@ async function speakText({ text, protocol, baseUrl, apiKey, model, voice, speed 
   const p = protocol || 'openai-compatible';
   if (p === 'openai-compatible') {
     const base = normalizeBaseUrl(p, baseUrl);
-    const body = { model, input: text, voice: voice || 'alloy' };
-    if (speed) body.speed = Number(speed);
+    const body = { model, input: text };
+    if (voice) body.voice = voice;
+    if (speed !== undefined && speed !== '') body.speed = Number(speed);
     const res = await fetch(`${base}/audio/speech`, {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
@@ -507,10 +627,9 @@ const server = http.createServer(async (req, res) => {
   if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
 
   if (pathname === '/api/models' && req.method === 'POST') {
-    const body = JSON.parse(await readBody(req) || '{}');
     try {
-      const models = await listModels({ protocol: body.protocol || body.provider, provider: body.provider, baseUrl: body.baseUrl, apiKey: body.apiKey });
-      return json(res, 200, { models });
+      const cands = await ensureChatCandidates();
+      return json(res, 200, { models: cands.map(c => ({ id: c.model, name: c.model })) });
     } catch (e) { return bad(res, e.message); }
   }
 
@@ -519,10 +638,10 @@ const server = http.createServer(async (req, res) => {
     if (!contentType.includes('multipart/form-data')) return bad(res, 'expected multipart/form-data');
     try {
       const buf = await readBufferBody(req);
-      const { fields, files } = parseMultipart(buf, contentType);
+      const { files } = parseMultipart(buf, contentType);
       const audio = files.find(f => f.name === 'audio');
       if (!audio) return bad(res, 'audio file is required');
-      const text = await transcribeAudio({ audio, protocol: fields.protocol, baseUrl: fields.baseUrl, apiKey: fields.apiKey, model: fields.model, language: fields.language });
+      const text = await transcribeWithFallback(audio);
       return json(res, 200, { text });
     } catch (e) { return bad(res, e.message); }
   }
@@ -531,7 +650,7 @@ const server = http.createServer(async (req, res) => {
     const body = JSON.parse(await readBody(req) || '{}');
     if (!body.text) return bad(res, 'text is required');
     try {
-      const { body: stream, contentType } = await speakText({ text: body.text, protocol: body.protocol, baseUrl: body.baseUrl, apiKey: body.apiKey, model: body.model, voice: body.voice, speed: body.speed });
+      const { body: stream, contentType } = await speakWithFallback(body.text);
       res.writeHead(200, { 'Content-Type': contentType, 'Content-Disposition': 'inline' });
       if (stream) {
         const reader = stream.getReader();
@@ -549,8 +668,6 @@ const server = http.createServer(async (req, res) => {
   if (pathname === '/api/interview/framework' && req.method === 'POST') {
     const body = JSON.parse(await readBody(req) || '{}');
     if (!body.goal?.trim()) return bad(res, 'goal is required');
-    const protocol = body.protocol || body.provider;
-    if (!protocol || !body.apiKey || !body.model) return bad(res, 'protocol/provider, apiKey, model are required');
     const design = {
       goal: body.goal,
       targetAudience: body.targetAudience || '',
@@ -559,7 +676,7 @@ const server = http.createServer(async (req, res) => {
       methodology: body.methodology || 'general',
     };
     try {
-      const framework = await generateFramework(design, body.apiKey, protocol, normalizeBaseUrl(protocol, body.baseUrl), body.model, body.lang || 'en');
+      const framework = await generateFramework(design, body.lang || 'en');
       return json(res, 200, { framework });
     } catch (e) { return bad(res, e.message); }
   }
@@ -567,8 +684,6 @@ const server = http.createServer(async (req, res) => {
   if (pathname === '/api/interview/start' && req.method === 'POST') {
     const body = JSON.parse(await readBody(req) || '{}');
     if (!body.goal?.trim()) return bad(res, 'goal is required');
-    const protocol = body.protocol || body.provider;
-    if (!protocol || !body.apiKey || !body.model) return bad(res, 'protocol/provider, apiKey, model are required');
     if (!body.framework || !validateFramework(body.framework)) return bad(res, 'framework is required');
     const id = crypto.randomUUID();
     const session = {
@@ -578,17 +693,17 @@ const server = http.createServer(async (req, res) => {
       scenarios: body.scenarios || '',
       persona: body.persona || '',
       methodology: body.methodology || 'general',
-      protocol,
-      provider: protocol,
+      protocol: CONFIG.chat.protocol,
+      provider: CONFIG.chat.protocol,
       lang: body.lang || 'en',
-      baseUrl: normalizeBaseUrl(protocol, body.baseUrl),
-      model: body.model,
+      baseUrl: CONFIG.chat.baseUrl,
+      model: currentChat?.model || CONFIG.chat.candidates[0]?.model || '',
       framework: body.framework,
       state: initState(body.framework),
       createdAt: new Date().toISOString(),
       messages: [],
     };
-    const first = await decideNext(session, null, body.apiKey, body.lang || session.lang || 'en');
+    const first = await decideNext(session, null, body.lang || session.lang || 'en');
     updateState(session, first);
     session.messages.push({ role: 'assistant', text: first.question, action: first.action, reason: first.reason, topic_id: session.state.currentTopicId, stage: session.state.topicStage, ts: new Date().toISOString() });
     await saveSession(session);
@@ -602,10 +717,9 @@ const server = http.createServer(async (req, res) => {
     if (!session) return json(res, 404, { error: 'session not found' });
     const body = JSON.parse(await readBody(req) || '{}');
     if (!body.text?.trim()) return bad(res, 'text is required');
-    if (!body.apiKey) return bad(res, 'apiKey is required');
     if (session.state.interviewEnded) return json(res, 200, { message: '访谈已经结束，谢谢你的时间。', interviewEnded: true });
     session.messages.push({ role: 'user', text: body.text, ts: new Date().toISOString() });
-    const reply = await decideNext(session, body.text, body.apiKey, body.lang || session.lang || 'en');
+    const reply = await decideNext(session, body.text, body.lang || session.lang || 'en');
     updateState(session, reply);
     session.messages.push({ role: 'assistant', text: reply.question, action: reply.action, reason: reply.reason, topic_id: session.state.currentTopicId, stage: session.state.topicStage, ts: new Date().toISOString() });
     await saveSession(session);
@@ -618,8 +732,7 @@ const server = http.createServer(async (req, res) => {
     const session = await loadSession(id);
     if (!session) return json(res, 404, { error: 'session not found' });
     const body = JSON.parse(await readBody(req) || '{}');
-    if (!body.apiKey) return bad(res, 'apiKey is required');
-    const report = await generateReport(session, body.apiKey, body.lang || session.lang || 'en');
+    const report = await generateReport(session, body.lang || session.lang || 'en');
     session.lastReport = report;
     await saveSession(session);
 
@@ -632,8 +745,7 @@ const server = http.createServer(async (req, res) => {
     const session = await loadSession(id);
     if (!session) return json(res, 404, { error: 'session not found' });
     const body = JSON.parse(await readBody(req) || '{}');
-    if (!body.apiKey) return bad(res, 'apiKey is required');
-    const evaluation = await evaluateConversation(session, body.apiKey, body.lang || session.lang || 'en');
+    const evaluation = await evaluateConversation(session, body.lang || session.lang || 'en');
     session.lastEvaluation = evaluation;
     await saveSession(session);
 

@@ -204,7 +204,11 @@ const mockProvider = http.createServer((req, res) => {
   req.on('end', () => {
     if (req.url === '/v1/models') {
       res.writeHead(200);
-      res.end(JSON.stringify({ data: [{ id: 'mock-model' }] }));
+      res.end(JSON.stringify({ data: [
+        { id: 'mock-model', supported_endpoint_types: ['openai'] },
+        { id: 'mock-asr' },
+        { id: 'mock-tts' },
+      ] }));
       return;
     }
     if (req.url === '/v1/chat/completions') {
@@ -292,14 +296,21 @@ async function getJson(base, path) {
 }
 
 mockProvider.listen(3001, async () => {
-  const main = spawn('node', ['server.js'], { env: { ...process.env, PORT: '3002' }, stdio: 'inherit' });
+  const provider = { protocol: 'openai-compatible', baseUrl: 'http://localhost:3001/v1', apiKey: 'fake-key' };
+  const env = {
+    ...process.env,
+    PORT: '3002',
+    TEXT_PROVIDERS: JSON.stringify([provider]),
+    TEXT_PREFERENCES: JSON.stringify(['mock-model']),
+    STT_PROVIDERS: JSON.stringify([provider]),
+    STT_PREFERENCES: JSON.stringify(['mock-asr']),
+    TTS_PROVIDERS: JSON.stringify([provider]),
+    TTS_PREFERENCES: JSON.stringify([{ model: 'mock-tts' }]),
+  };
+  const main = spawn('node', ['server.js'], { env, stdio: 'inherit' });
   await new Promise(r => setTimeout(r, 800));
 
   const base = 'http://localhost:3002';
-  const cfg = { protocol: 'openai-compatible', baseUrl: 'http://localhost:3001/v1', apiKey: 'fake-key', model: 'mock-model' };
-  const cfgAnthropic = { protocol: 'anthropic-compatible', baseUrl: 'http://localhost:3001/v1', apiKey: 'fake-key', model: 'mock-model' };
-  const sttCfg = { protocol: 'openai-compatible', baseUrl: 'http://localhost:3001/v1', apiKey: 'fake-key', model: 'whisper-1' };
-  const hfCfg = { protocol: 'huggingface-task', baseUrl: 'http://localhost:3001/hf/chat', apiKey: 'hf-fake', model: 'hf-model' };
   const design = { goal: 'test goal', targetAudience: 'test audience', scenarios: 'test scenario', persona: 'test persona', methodology: 'JTBD' };
 
   const askedQuestions = [];
@@ -308,21 +319,17 @@ mockProvider.listen(3001, async () => {
   };
 
   try {
-    // List models
-    const models = await post(base, '/api/models', cfg);
+    // List models uses baked-in config.
+    const models = await post(base, '/api/models', {});
     assert(models.models[0].id === 'mock-model', 'models list failed');
 
     // Generate framework
-    const fw = await post(base, '/api/interview/framework', { ...cfg, ...design, lang: 'zh' });
+    const fw = await post(base, '/api/interview/framework', { ...design, lang: 'zh' });
     assert(fw.framework.topics.length === 4, 'framework generation failed');
 
     // STT transcription
     const form = new FormData();
     form.append('audio', new Blob(['fake-audio'], { type: 'audio/webm' }), 'chunk.webm');
-    form.append('protocol', sttCfg.protocol);
-    form.append('baseUrl', sttCfg.baseUrl);
-    form.append('apiKey', sttCfg.apiKey);
-    form.append('model', sttCfg.model);
     const sttRes = await fetch(`${base}/api/transcribe`, { method: 'POST', body: form });
     if (!sttRes.ok) throw new Error(`STT failed ${sttRes.status}: ${await sttRes.text()}`);
     const sttData = await sttRes.json();
@@ -332,41 +339,11 @@ mockProvider.listen(3001, async () => {
     const ttsRes = await fetch(`${base}/api/speak`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: 'hello', protocol: 'openai-compatible', baseUrl: 'http://localhost:3001/v1', apiKey: 'fake-key', model: 'tts-1', voice: 'alloy' })
+      body: JSON.stringify({ text: 'hello' })
     });
     assert(ttsRes.ok && ttsRes.headers.get('content-type') === 'audio/mpeg', 'TTS should return audio');
     const ttsBuf = Buffer.from(await ttsRes.arrayBuffer());
     assert(ttsBuf.toString() === 'fake-audio-bytes', 'TTS audio bytes mismatch');
-
-    const elevenTtsRes = await fetch(`${base}/api/speak`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: '你好 world', protocol: 'elevenlabs', baseUrl: 'http://localhost:3001/v1', apiKey: 'eleven-key', model: 'eleven_multilingual_v2', voice: 'test-voice', speed: '1.15' })
-    });
-    assert(elevenTtsRes.ok && elevenTtsRes.headers.get('content-type') === 'audio/mpeg', 'ElevenLabs TTS should return audio');
-    assert(Buffer.from(await elevenTtsRes.arrayBuffer()).toString() === 'eleven-audio-bytes', 'ElevenLabs TTS audio bytes mismatch');
-    assert(elevenRequest?.headers['xi-api-key'] === 'eleven-key', 'ElevenLabs should use xi-api-key header');
-    assert(elevenRequest?.body?.text === '你好 world', 'ElevenLabs should send text body');
-    assert(elevenRequest?.body?.model_id === 'eleven_multilingual_v2', 'ElevenLabs should send model_id');
-    assert(elevenRequest?.body?.voice_settings?.speed === 1.15, 'ElevenLabs should send voice_settings.speed');
-
-    // Hugging Face task STT and TTS
-    const hfForm = new FormData();
-    hfForm.append('audio', new Blob(['fake-audio'], { type: 'audio/webm' }), 'chunk.webm');
-    hfForm.append('protocol', 'huggingface-task');
-    hfForm.append('baseUrl', 'http://localhost:3001/hf/asr');
-    hfForm.append('apiKey', hfCfg.apiKey);
-    hfForm.append('model', 'hf-asr');
-    const hfSttRes = await fetch(`${base}/api/transcribe`, { method: 'POST', body: hfForm });
-    assert(hfSttRes.ok, 'Hugging Face STT should succeed');
-    assert((await hfSttRes.json()).text === 'hf spoken answer', 'Hugging Face STT transcript failed');
-    const hfTtsRes = await fetch(`${base}/api/speak`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: 'hello', protocol: 'huggingface-task', baseUrl: 'http://localhost:3001/hf/tts', apiKey: hfCfg.apiKey, model: 'hf-tts' })
-    });
-    assert(hfTtsRes.ok && hfTtsRes.headers.get('content-type') === 'audio/wav', 'Hugging Face TTS should return audio');
-    assert(Buffer.from(await hfTtsRes.arrayBuffer()).toString() === 'hf-audio-bytes', 'Hugging Face TTS audio bytes mismatch');
 
     // Validation errors should remain JSON, not crash the server.
     const invalidStt = await fetch(`${base}/api/transcribe`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
@@ -374,39 +351,26 @@ mockProvider.listen(3001, async () => {
     const invalidTts = await fetch(`${base}/api/speak`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
     assert(invalidTts.status === 400, 'missing TTS text should return 400');
 
-    // Start interview with Hugging Face task protocol
-    const hfStart = await post(base, '/api/interview/start', { ...hfCfg, ...design, framework: fw.framework, lang: 'en' });
-    assert(hfStart.topic_id === 't1' && hfStart.action === 'ask', 'Hugging Face task chat start failed');
-
-    // Start interview with anthropic-compatible protocol
-    const anthStart = await post(base, '/api/interview/start', { ...cfgAnthropic, ...design, framework: fw.framework, lang: 'zh' });
-    assert(anthStart.topic_id === 't1', 'anthropic-compatible start topic_id failed');
-    assert(anthStart.action === 'ask', 'anthropic-compatible start action should be ask');
-
-    // Start interview with openai-compatible protocol
-    const enStart = await post(base, '/api/interview/start', { ...cfg, ...design, framework: fw.framework, lang: 'en' });
-    assert(enStart.topic_id === 't1', 'English start topic_id failed');
-    assert(enStart.action === 'ask', 'English start action should be ask');
-
-    const start = await post(base, '/api/interview/start', { ...cfg, ...design, framework: fw.framework, lang: 'zh' });
+    // Start interview
+    const start = await post(base, '/api/interview/start', { ...design, framework: fw.framework, lang: 'zh' });
     assert(start.topic_id === 't1', 'start topic_id failed');
     assert(start.action === 'ask', 'start action should be ask');
     pushQuestion(start.message);
 
     // Turn 1: normal answer, stays in introduce
-    const m1 = await post(base, `/api/interview/${start.id}/message`, { text: '我是产品经理', apiKey: cfg.apiKey, lang: 'zh' });
+    const m1 = await post(base, `/api/interview/${start.id}/message`, { text: '我是产品经理', lang: 'zh' });
     assert(m1.topic_id === 't1', 'should stay in t1');
     assert(m1.action !== 'end', 'should not end yet');
     pushQuestion(m1.message);
 
     // Turn 2: user asks a question -> assistant should clarify and continue, not repeat
-    const m2 = await post(base, `/api/interview/${start.id}/message`, { text: '你为什么问这个？', apiKey: cfg.apiKey, lang: 'zh' });
+    const m2 = await post(base, `/api/interview/${start.id}/message`, { text: '你为什么问这个？', lang: 'zh' });
     assert(m2.action === 'ask' || m2.action === 'probe', 'user question should be answered/clarified');
     assert(!askedQuestions.includes(m2.message), 'question should not repeat previous');
     pushQuestion(m2.message);
 
     // Turn 3: concrete answer -> transition to explore, question must be specific, not "继续往下聊"
-    const m3 = await post(base, `/api/interview/${start.id}/message`, { text: '我们经常加班处理数据，很烦', apiKey: cfg.apiKey, lang: 'zh' });
+    const m3 = await post(base, `/api/interview/${start.id}/message`, { text: '我们经常加班处理数据，很烦', lang: 'zh' });
     assert(m3.action === 'transition', 'should transition from introduce');
     assert(m3.topic_id === 't2', 'should move to t2');
     assert(m3.stage === 'explore', 'next stage should be explore');
@@ -415,44 +379,44 @@ mockProvider.listen(3001, async () => {
     pushQuestion(m3.message);
 
     // Turn 4: vague answer -> probe/clarify
-    const m4 = await post(base, `/api/interview/${start.id}/message`, { text: '可能吧，我也说不太清楚', apiKey: cfg.apiKey, lang: 'zh' });
+    const m4 = await post(base, `/api/interview/${start.id}/message`, { text: '可能吧，我也说不太清楚', lang: 'zh' });
     assert(m4.topic_id === 't2', 'should stay in t2');
     assert(m4.action === 'probe' || m4.action === 'ask', 'vague answer should be clarified');
     pushQuestion(m4.message);
 
     // Turn 5: concrete answer -> transition to probe (transition question counts as first explore turn)
-    const m5 = await post(base, `/api/interview/${start.id}/message`, { text: '我们团队三个人都受影响', apiKey: cfg.apiKey, lang: 'zh' });
+    const m5 = await post(base, `/api/interview/${start.id}/message`, { text: '我们团队三个人都受影响', lang: 'zh' });
     assert(m5.action === 'transition', 'should transition from explore');
     assert(m5.topic_id === 't3', 'should move to t3');
     pushQuestion(m5.message);
 
     // Turn 6: answer in probe -> transition to confirm (probe min=1, transition question counts as first probe turn)
-    const m6 = await post(base, `/api/interview/${start.id}/message`, { text: '每周浪费五小时', apiKey: cfg.apiKey, lang: 'zh' });
+    const m6 = await post(base, `/api/interview/${start.id}/message`, { text: '每周浪费五小时', lang: 'zh' });
     assert(m6.action === 'transition', 'should transition from probe');
     assert(m6.topic_id === 't4', 'should move to t4');
     pushQuestion(m6.message);
 
     // Turn 7: confirm -> end (transition question counts as first confirm turn)
-    const m7 = await post(base, `/api/interview/${start.id}/message`, { text: '因为不想重复工作', apiKey: cfg.apiKey, lang: 'zh' });
+    const m7 = await post(base, `/api/interview/${start.id}/message`, { text: '因为不想重复工作', lang: 'zh' });
     assert(m7.action === 'end', 'should end after confirm');
     assert(m7.interviewEnded, 'interviewEnded should be true');
 
     // Turn 8: trying to send after end returns neutral end message
-    const m8 = await post(base, `/api/interview/${start.id}/message`, { text: '自动化能减少出错', apiKey: cfg.apiKey, lang: 'zh' });
+    const m8 = await post(base, `/api/interview/${start.id}/message`, { text: '自动化能减少出错', lang: 'zh' });
     assert(m8.interviewEnded, 'after-end should keep ended flag');
     assert(!m8.message.includes('生成报告'), 'end message should not mention report for respondent mode');
 
     // Turn 9: another after-end message stays ended
-    const m9 = await post(base, `/api/interview/${start.id}/message`, { text: '对的，没有了', apiKey: cfg.apiKey, lang: 'zh' });
+    const m9 = await post(base, `/api/interview/${start.id}/message`, { text: '对的，没有了', lang: 'zh' });
     assert(m9.interviewEnded, 'after-end should keep ended flag');
 
     // Generate report
-    const report = await post(base, `/api/interview/${start.id}/report`, { apiKey: cfg.apiKey, lang: 'zh' });
+    const report = await post(base, `/api/interview/${start.id}/report`, { lang: 'zh' });
     assert(report.goal === 'test goal', 'report goal failed');
     assert(report.report.summary === 'mock summary', 'report summary failed');
 
     // Evaluate conversation
-    const evaluation = await post(base, `/api/interview/${start.id}/evaluate`, { apiKey: cfg.apiKey, lang: 'zh' });
+    const evaluation = await post(base, `/api/interview/${start.id}/evaluate`, { lang: 'zh' });
     assert(evaluation.evaluation.overall_comment === 'mock overall comment', 'evaluate failed');
 
     const exported = await getJson(base, `/api/interview/${start.id}/export`);
