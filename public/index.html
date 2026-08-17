@@ -10,53 +10,465 @@
 </head>
 <body>
   <div class="shell">
-    <header class="top"><div class="brand"><img src="/OliverWyman-logo-2021.jpg" alt="Oliver Wyman"><span>Insights</span></div><div class="langs"><button class="active" data-lang="en">English</button><button data-lang="zh">中文</button></div></header>
-    <nav class="steps"><span class="step active" data-step="setup">1 <i></i></span><span class="step" data-step="framework">2 <i></i></span><span class="step" data-step="role">3 <i></i></span><span class="step" data-step="chat">4 <i></i></span><span class="step" data-step="report">5 <i></i></span></nav>
-    <div id="overlay" class="overlay"><div class="card"><div class="eyebrow">Insights</div><h2 id="overlayTitle"></h2><p id="overlayText" class="muted"></p><div class="progress"><span id="overlayBar"></span></div></div></div>
+    <header class="top">
+      <div class="brand"><img src="/OliverWyman-logo-2021.jpg" alt="Oliver Wyman"><span>Insights</span></div>
+      <div class="langs"><button class="active" data-lang="en">English</button><button data-lang="zh">中文</button></div>
+    </header>
+    <nav class="steps">
+      <span class="step active" data-step="setup">1 <i></i></span>
+      <span class="step" data-step="framework">2 <i></i></span>
+      <span class="step" data-step="role">3 <i></i></span>
+      <span class="step" data-step="chat">4 <i></i></span>
+      <span class="step" data-step="report">5 <i></i></span>
+    </nav>
+
+    <div id="overlay" class="overlay">
+      <div class="card">
+        <div class="eyebrow">Insights</div>
+        <h2 id="overlayTitle"></h2>
+        <p id="overlayText" class="muted"></p>
+        <div class="progress"><span id="overlayBar"></span></div>
+      </div>
+    </div>
+
     <section id="setup" class="card">
-      <div class="eyebrow">Voice research</div><h1 data-copy="setup.title"></h1><p class="muted" data-copy="appSubtitle"></p>
+      <div class="eyebrow">Voice research</div>
+      <h1 data-copy="setup.title"></h1>
+      <p class="muted" data-copy="appSubtitle"></p>
       <div class="service" style="margin-bottom:16px">
         <div class="service-head"><h3 data-copy="provider.chatTitle"></h3><span class="pill" data-copy="setup.preconfigured"></span></div>
         <p class="muted" data-copy="setup.preconfiguredHint" style="margin:0"></p>
       </div>
       <label data-copy="setup.goalLabel"></label><textarea id="goal"></textarea>
-      <div class="grid two"><div><label data-copy="setup.methodologyLabel"></label><select id="methodology"><option value="general">General</option><option value="JTBD">Jobs-to-be-Done</option><option value="5whys">5 Whys</option><option value="star">STAR</option><option value="persona">Persona</option></select></div><div><label data-copy="setup.targetAudienceLabel"></label><textarea id="targetAudience"></textarea></div></div>
-      <div class="grid two"><div><label data-copy="setup.scenariosLabel"></label><textarea id="scenarios"></textarea></div><div><label data-copy="setup.personaLabel"></label><textarea id="persona"></textarea></div></div>
-      <div class="actions" style="margin-top:18px"><button id="generateBtn" class="btn" data-copy="setup.start"></button></div><div id="setupError" class="error hidden"></div>
+      <div class="grid two">
+        <div>
+          <label data-copy="setup.methodologyLabel"></label>
+          <select id="methodology">
+            <option value="general">General</option>
+            <option value="JTBD">Jobs-to-be-Done</option>
+            <option value="5whys">5 Whys</option>
+            <option value="star">STAR</option>
+            <option value="persona">Persona</option>
+          </select>
+        </div>
+        <div><label data-copy="setup.targetAudienceLabel"></label><textarea id="targetAudience"></textarea></div>
+      </div>
+      <div class="grid two">
+        <div><label data-copy="setup.scenariosLabel"></label><textarea id="scenarios"></textarea></div>
+        <div><label data-copy="setup.personaLabel"></label><textarea id="persona"></textarea></div>
+      </div>
+      <div class="actions" style="margin-top:18px"><button id="generateBtn" class="btn" data-copy="setup.start"></button></div>
+      <div id="setupError" class="error hidden"></div>
     </section>
-    <section id="framework" class="card hidden"><div class="eyebrow">Research design</div><h2 data-copy="framework.title"></h2><p class="muted" data-copy="framework.subtitle"></p><div id="frameworkStats" class="grid three"></div><div id="frameworkHost" class="list" style="margin-top:14px"></div><div id="frameworkError" class="error hidden"></div><div class="actions" style="margin-top:18px"><button id="backBtn" class="btn secondary" data-copy="framework.backToSetup"></button><button id="startBtn" class="btn" data-copy="framework.startInterview"></button></div></section>
-    <section id="role" class="card hidden"><div class="eyebrow">Role</div><h1 data-copy="role.title"></h1><p class="muted" data-copy="role.subtitle"></p><div class="grid two"><button id="respondentBtn" class="choice"><strong data-copy="role.respondent"></strong><span data-copy="role.respondentDesc"></span></button><button id="interviewerBtn" class="choice"><strong data-copy="role.interviewer"></strong><span data-copy="role.interviewerDesc"></span></button></div></section>
-    <section id="chat" class="card hidden"><div class="bar"><div><div class="eyebrow">Live interview</div><h2 data-copy="chat.title"></h2></div><div class="actions interviewer-only"><button id="muteBtn" class="btn secondary"></button><button id="endBtn" class="btn danger" data-copy="chat.end"></button></div></div><div id="endedNotice" class="notice hidden"></div><div class="chat-shell"><div id="messages" class="chat"></div><div id="partial" class="partial"></div><div id="chatError" class="error hidden"></div><div class="composer"><textarea id="answer"></textarea><button id="recordBtn" class="btn secondary icon" title="Record">●</button><button id="sendBtn" class="btn" data-copy="chat.send"></button></div><button id="nextBtn" class="btn secondary interviewer-only hidden" data-copy="chat.nextQuestion"></button></div></section>
-    <section id="thanks" class="card hidden" style="text-align:center;padding:80px 24px"><div class="eyebrow" data-copy="thanks.eyebrow"></div><h1 data-copy="thanks.title"></h1><p class="muted" data-copy="thanks.subtitle"></p></section>
-    <section id="report" class="card hidden"><div class="bar"><div><div class="eyebrow">Evidence</div><h2 data-copy="report.title"></h2></div><div class="actions interviewer-only"><button id="csvBtn" class="btn secondary" data-copy="report.downloadCsv"></button><button id="allBtn" class="btn secondary" data-copy="report.downloadAll"></button><button id="evalBtn" class="btn secondary" data-copy="report.evaluate"></button><button id="newBtn" class="btn secondary" data-copy="report.newInterview"></button></div></div><div id="evalHost"></div><div id="reportHost"></div><details style="margin-top:18px"><summary data-copy="report.transcript"></summary><div id="transcriptHost" class="table-wrap" style="margin-top:12px"></div></details></section>
+
+    <section id="framework" class="card hidden">
+      <div class="eyebrow">Research design</div>
+      <h2 data-copy="framework.title"></h2>
+      <p class="muted" data-copy="framework.subtitle"></p>
+      <div id="frameworkStats" class="grid three"></div>
+      <div id="frameworkHost" class="list" style="margin-top:14px"></div>
+      <div id="frameworkError" class="error hidden"></div>
+      <div class="actions" style="margin-top:18px">
+        <button id="backBtn" class="btn secondary" data-copy="framework.backToSetup"></button>
+        <button id="startBtn" class="btn" data-copy="framework.startInterview"></button>
+      </div>
+    </section>
+
+    <section id="role" class="card hidden">
+      <div class="eyebrow">Role</div>
+      <h1 data-copy="role.title"></h1>
+      <p class="muted" data-copy="role.subtitle"></p>
+      <div class="grid two">
+        <button id="respondentBtn" class="choice"><strong data-copy="role.respondent"></strong><span data-copy="role.respondentDesc"></span></button>
+        <button id="interviewerBtn" class="choice"><strong data-copy="role.interviewer"></strong><span data-copy="role.interviewerDesc"></span></button>
+      </div>
+    </section>
+
+    <section id="chat" class="card hidden">
+      <div class="bar">
+        <div>
+          <div class="eyebrow">Live interview</div>
+          <h2 data-copy="chat.title"></h2>
+        </div>
+        <div class="actions interviewer-only">
+          <button id="muteBtn" class="btn secondary"></button>
+          <button id="endBtn" class="btn danger" data-copy="chat.end"></button>
+        </div>
+      </div>
+      <div id="endedNotice" class="notice hidden"></div>
+      <div class="chat-shell">
+        <div id="messages" class="chat"></div>
+        <div id="partial" class="partial"></div>
+        <div id="chatError" class="error hidden"></div>
+        <div class="composer">
+          <textarea id="answer"></textarea>
+          <button id="recordBtn" class="btn secondary icon" title="Record">●</button>
+          <button id="sendBtn" class="btn" data-copy="chat.send"></button>
+        </div>
+        <button id="nextBtn" class="btn secondary interviewer-only hidden" data-copy="chat.nextQuestion"></button>
+      </div>
+    </section>
+
+    <section id="thanks" class="card hidden" style="text-align:center;padding:80px 24px">
+      <div class="eyebrow" data-copy="thanks.eyebrow"></div>
+      <h1 data-copy="thanks.title"></h1>
+      <p class="muted" data-copy="thanks.subtitle"></p>
+    </section>
+
+    <section id="report" class="card hidden">
+      <div class="bar">
+        <div>
+          <div class="eyebrow">Evidence</div>
+          <h2 data-copy="report.title"></h2>
+        </div>
+        <div class="actions interviewer-only">
+          <button id="csvBtn" class="btn secondary" data-copy="report.downloadCsv"></button>
+          <button id="csvTranscriptBtn" class="btn secondary" data-copy="report.downloadTranscriptCsv"></button>
+          <button id="allBtn" class="btn secondary" data-copy="report.downloadAll"></button>
+          <button id="evalBtn" class="btn secondary" data-copy="report.evaluate"></button>
+          <button id="newBtn" class="btn secondary" data-copy="report.newInterview"></button>
+        </div>
+      </div>
+      <div id="evalHost"></div>
+      <div id="reportHost"></div>
+      <details style="margin-top:18px">
+        <summary data-copy="report.transcript"></summary>
+        <div id="transcriptHost" class="table-wrap" style="margin-top:12px"></div>
+      </details>
+    </section>
   </div>
+
   <script>
-    const $=id=>document.getElementById(id);const state={lang:'en',sessionId:null,framework:null,mode:'interviewer',rows:[],mute:false,recorder:null,chunks:[],timer:null,busySTT:false};
-    const tr=(key,fallback='')=>window.t?window.t(key,state.lang,fallback):fallback||key;const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-    function setPhase(id){['setup','framework','role','chat','thanks','report'].forEach(x=>$(x).classList.toggle('hidden',x!==id));document.querySelectorAll('.step').forEach((el,i)=>{const steps=['setup','framework','role','chat','report'];el.classList.toggle('active',el.dataset.step===id);el.classList.toggle('done',steps.indexOf(id)>i)})}
-    function design(){return{goal:$('goal').value.trim(),methodology:$('methodology').value,targetAudience:$('targetAudience').value.trim(),scenarios:$('scenarios').value.trim(),persona:$('persona').value.trim()}}
-    async function request(url,body={}){const res=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...body,lang:state.lang})});const data=await res.json().catch(()=>({}));if(!res.ok)throw new Error(data.error||`HTTP ${res.status}`);return data}
-    function error(id,msg){$(id).textContent=msg;$(id).classList.remove('hidden')}function clearError(id){$(id).textContent='';$(id).classList.add('hidden')}
-    function overlay(title,text){$('overlayTitle').textContent=title;$('overlayText').textContent=text;$('overlay').classList.add('active');let p=8;$('overlayBar').style.width=p+'%';return setInterval(()=>{$('overlayBar').style.width=(p=Math.min(90,p+11))+'%'},700)}function closeOverlay(timer){clearInterval(timer);$('overlayBar').style.width='100%';setTimeout(()=>{$('overlay').classList.remove('active');$('overlayBar').style.width='0%'},250)}
-    function stageName(stage){return tr(`stageLabels.${stage}`,stage)}
-    function applyLanguage(){document.documentElement.lang=state.lang;document.querySelectorAll('[data-copy]').forEach(el=>{const key=el.dataset.copy;el.textContent=tr(key)});document.querySelectorAll('.step i').forEach((el,i)=>el.textContent=tr(`phases.${i}`));$('goal').placeholder=tr('setup.goalPlaceholder');$('targetAudience').placeholder=tr('setup.targetAudiencePlaceholder');$('scenarios').placeholder=tr('setup.scenariosPlaceholder');$('persona').placeholder=tr('setup.personaPlaceholder');$('answer').placeholder=tr('chat.inputPlaceholder');$('endedNotice').textContent=tr('chat.endedNotice');$('muteBtn').textContent=state.mute?tr('chat.unmute'):tr('chat.mute');['General','Jobs-to-be-Done','5 Whys','STAR','Persona'].forEach((label,i)=>{$('methodology').options[i].text=state.lang==='zh'?['通用','Jobs-to-be-Done','五问法','STAR','画像'][i]:label});if(state.framework)renderFramework();document.querySelectorAll('[data-lang]').forEach(b=>b.classList.toggle('active',b.dataset.lang===state.lang))}
-    function frameworkHTML(fw){const topics=fw.topics||[];$('frameworkStats').innerHTML=`<div class="metric"><b>${topics.length}</b><span>${tr('framework.topic')}</span></div><div class="metric"><b>${fw.estimatedTurns||'-'}</b><span>${tr('framework.estimatedTurns')}</span></div><div class="metric"><b>${(fw.endingCriteria||[]).length}</b><span>${tr('framework.endingCriteria')}</span></div>`;$('frameworkHost').innerHTML=topics.map((topic,i)=>`<div class="service framework-block" data-index="${i}"><div class="eyebrow">${tr('framework.topic')} ${i+1}</div><label>${tr('framework.name')}</label><input data-field="name" value="${esc(topic.name)}"><label>${tr('framework.goal')}</label><textarea data-field="goal">${esc(topic.goal)}</textarea><div class="grid three"><div><label>${tr('framework.stage')}</label><select data-field="stage">${['introduce','explore','probe','confirm'].map(s=>`<option value="${s}" ${s===topic.stage?'selected':''}>${stageName(s)}</option>`).join('')}</select></div><div><label>${tr('framework.minQuestions')}</label><input data-field="min_questions" type="number" min="1" value="${Number(topic.min_questions||1)}"></div><div><label>${tr('framework.maxQuestions')}</label><input data-field="max_questions" type="number" min="1" value="${Number(topic.max_questions||1)}"></div></div><label>${tr('framework.focusPrompt')}</label><textarea data-field="focus_prompt">${esc(topic.focus_prompt||'')}</textarea></div>`).join('')+`<div class="service"><div class="eyebrow">${tr('framework.endingCriteria')}</div>${(fw.endingCriteria||[]).map((x,i)=>`<input data-ending="${i}" value="${esc(x)}" style="margin-top:8px">`).join('')}</div>`;document.querySelectorAll('.framework-block').forEach(block=>block.querySelectorAll('[data-field]').forEach(el=>el.oninput=()=>{const t=state.framework.topics[Number(block.dataset.index)];t[el.dataset.field]=el.type==='number'?Math.max(1,Number(el.value||1)):el.value}));document.querySelectorAll('[data-ending]').forEach(el=>el.oninput=()=>{state.framework.endingCriteria[Number(el.dataset.ending)]=el.value})}
-    function renderFramework(){frameworkHTML(state.framework)}
-    async function generateFramework(){clearError('setupError');const d=design();if(!d.goal)return error('setupError',tr('errors.goalRequired'));const timer=overlay(tr('status.generatingFramework'),tr('setup.frameworkHint'));$('generateBtn').disabled=true;try{state.framework=(await request('/api/interview/framework',d)).framework;renderFramework();setPhase('framework')}catch(e){error('setupError',e.message)}finally{$('generateBtn').disabled=false;closeOverlay(timer)}}
-    async function startInterview(mode){clearError('frameworkError');if(!state.framework?.topics?.length)return error('frameworkError',tr('errors.frameworkRequired'));state.mode=mode;document.body.classList.toggle('respondent',mode==='respondent');const d=design(),timer=overlay(tr('status.startingInterview'),tr('status.generatingQuestion'));try{const data=await request('/api/interview/start',{...d,framework:state.framework});state.sessionId=data.id;state.rows=[];$('messages').innerHTML='';setPhase('chat');appendMessage('assistant',data.message,data);if(data.interviewEnded)finishChat()}catch(e){error('frameworkError',e.message)}finally{closeOverlay(timer)}}
-    function appendMessage(role,text,meta={}){const el=document.createElement('div');el.className=`msg ${role}`;el.innerHTML=esc(text);if(role==='assistant'&&(meta.topic_name||meta.stage||meta.action||meta.reason)){const m=document.createElement('div');m.className='meta';m.textContent=[meta.topic_name,meta.stage?stageName(meta.stage):'',meta.action].filter(Boolean).join(' · ')+(meta.reason?`\n${meta.reason}`:'');el.appendChild(m)}$('messages').appendChild(el);$('messages').scrollTop=$('messages').scrollHeight;state.rows.push({role,text,meta});if(role==='assistant')attachTTS(el,text)}
-    async function attachTTS(host,text){if(state.mute)return;const row=document.createElement('div');row.className='message-audio';row.textContent=tr('chat.playing');host.appendChild(row);try{const res=await fetch('/api/speak',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text})});if(!res.ok)throw new Error((await res.json().catch(()=>({}))).error||'TTS failed');const url=URL.createObjectURL(await res.blob());const audio=document.createElement('audio');audio.controls=true;audio.src=url;audio.onended=()=>URL.revokeObjectURL(url);row.replaceChildren(audio)}catch{const retry=document.createElement('button');retry.className='btn secondary';retry.textContent=tr('chat.retry');retry.onclick=()=>{row.remove();attachTTS(host,text)};row.replaceChildren(retry)}}
-    function finishChat(){if(state.mode==='respondent'){setPhase('thanks');return}$('endedNotice').classList.remove('hidden');$('nextBtn').classList.add('hidden')}
-    async function send(){const text=$('answer').value.trim();if(!text||!state.sessionId)return;clearError('chatError');$('answer').value='';appendMessage('user',text);$('sendBtn').disabled=true;try{const data=await request(`/api/interview/${state.sessionId}/message`,{text});appendMessage('assistant',data.message,data);if(data.interviewEnded)finishChat()}catch(e){error('chatError',e.message)}finally{$('sendBtn').disabled=false;$('answer').focus()}}
-    async function transcribe(final=false){if(!state.chunks.length||state.busySTT)return;state.busySTT=true;try{const blob=new Blob(state.chunks,{type:state.recorder?.mimeType||'audio/webm'});const form=new FormData();form.append('audio',blob,'answer.webm');const res=await fetch('/api/transcribe',{method:'POST',body:form});const data=await res.json().catch(()=>({}));if(!res.ok)throw new Error(data.error||'STT failed');$('partial').textContent=`${tr('chat.partialTranscript')}: ${data.text||''}`;if(final&&data.text){$('answer').value=data.text;$('partial').textContent=tr('chat.editTranscript')}}catch(e){$('partial').textContent=tr('chat.sttError')}finally{state.busySTT=false}}
-    async function toggleRecord(){if(state.recorder?.state==='recording'){state.recorder.stop();return}try{const stream=await navigator.mediaDevices.getUserMedia({audio:true});state.chunks=[];const type=MediaRecorder.isTypeSupported('audio/webm;codecs=opus')?'audio/webm;codecs=opus':'audio/webm';state.recorder=new MediaRecorder(stream,{mimeType:type});state.recorder.ondataavailable=e=>{if(e.data.size)state.chunks.push(e.data)};state.recorder.onstop=async()=>{clearInterval(state.timer);$('recordBtn').classList.remove('recording');$('recordBtn').textContent='●';stream.getTracks().forEach(t=>t.stop());await transcribe(true)};state.recorder.start(350);state.timer=setInterval(()=>transcribe(false),1500);$('recordBtn').classList.add('recording');$('recordBtn').textContent='■';$('partial').textContent=tr('chat.listening')}catch{error('chatError',tr('chat.micDenied'))}}
-    function renderReport(data){const r=data.report||{};$('reportHost').innerHTML=`<div class="grid three"><div class="metric"><b>${(r.themes||[]).length}</b><span>${tr('report.themes')}</span></div><div class="metric"><b>${(r.insights||[]).length}</b><span>${tr('report.insights')}</span></div><div class="metric"><b>${(r.recommendations||[]).length}</b><span>${tr('report.recommendations')}</span></div></div><div class="service"><div class="eyebrow">${tr('report.summary')}</div><p>${esc(r.summary||'')}</p></div>${r.sentiment?`<div class="service"><div class="eyebrow">${tr('report.sentiment')}</div><p>${esc(r.sentiment)}</p></div>`:''}${(r.themes||[]).length?`<h3>${tr('report.themes')}</h3><div class="grid three">${r.themes.map(x=>`<div class="service"><b>${esc(x.name)}</b><p class="muted">${esc(x.description)}</p>${x.quotes?.[0]?`<div class="quote">${esc(x.quotes[0])}</div>`:''}</div>`).join('')}</div>`:''}${(r.insights||[]).length?`<h3>${tr('report.insights')}</h3><div class="list">${r.insights.map(x=>`<div class="service"><b>${esc(x.finding)}</b><p class="muted">${esc(x.evidence)}</p></div>`).join('')}</div>`:''}${(r.recommendations||[]).length?`<h3>${tr('report.recommendations')}</h3><div class="grid two">${r.recommendations.map(x=>`<div class="service">${esc(x)}</div>`).join('')}</div>`:''}`;renderTranscript()}
-    function renderTranscript(){$('transcriptHost').innerHTML=`<table><thead><tr><th>Role</th><th>Text</th><th>Topic</th><th>Stage</th></tr></thead><tbody>${state.rows.map(r=>`<tr><td>${r.role==='assistant'?(state.lang==='zh'?'主持人':'Moderator'):(state.lang==='zh'?'受访者':'Respondent')}</td><td>${esc(r.text)}</td><td>${esc(r.meta?.topic_name||'')}</td><td>${esc(r.meta?.stage||'')}</td></tr>`).join('')}</tbody></table>`}
-    async function report(){const timer=overlay(tr('status.generatingReport'),tr('report.title'));try{renderReport(await request(`/api/interview/${state.sessionId}/report`));setPhase('report')}catch(e){error('chatError',e.message)}finally{closeOverlay(timer)}}
-    async function evaluate(){try{const e=(await request(`/api/interview/${state.sessionId}/evaluate`)).evaluation;const dims={naturalness:'Naturalness',relevance:'Relevance',probing:'Probing',single_question:'Single question',no_bias:'No bias',progression:'Progression',ending:'Ending',persona_fit:'Persona fit'};$('evalHost').innerHTML=`<div class="service"><div class="eyebrow">${tr('report.evaluate')}</div><p>${esc(e.overall_comment||'')}</p><div class="bar-list">${Object.entries(dims).map(([k,v])=>{const n=Number(e.scores?.[k]||0);return`<div class="barrow"><span>${v}</span><div class="track"><span style="width:${n/5*100}%"></span></div><b>${n}/5</b></div>`}).join('')}</div></div>`}catch(e){$('evalHost').innerHTML=`<div class="error">${esc(e.message)}</div>`}}
-    function csv(){const pairs=[];for(let i=0;i<state.rows.length;i++){if(state.rows[i].role==='assistant'){const a=state.rows[i+1]?.role==='user'?state.rows[i+1].text:'';pairs.push([pairs.length+1,state.rows[i].text,a]);if(a)i++}}const text=[['No.','Question','Answer'],...pairs].map(r=>r.map(v=>`"${String(v).replaceAll('"','""')}"`).join(',')).join('\n');const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\ufeff'+text],{type:'text/csv;charset=utf-8'}));a.download='interview-qa.csv';a.click();URL.revokeObjectURL(a.href)}
-    async function downloadAll(){if(!state.sessionId)return;const data=await fetch(`/api/interview/${state.sessionId}/export`).then(r=>r.json());const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));a.download=`interview-${state.sessionId}.json`;a.click();URL.revokeObjectURL(a.href)}
-    document.querySelectorAll('[data-lang]').forEach(b=>b.onclick=()=>{state.lang=b.dataset.lang;applyLanguage()});$('generateBtn').onclick=generateFramework;$('backBtn').onclick=()=>setPhase('setup');$('startBtn').onclick=()=>setPhase('role');$('respondentBtn').onclick=()=>startInterview('respondent');$('interviewerBtn').onclick=()=>startInterview('interviewer');$('sendBtn').onclick=send;$('answer').onkeydown=e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send()}};$('recordBtn').onclick=toggleRecord;$('nextBtn').onclick=()=>{$('answer').value=state.lang==='zh'?'继续':'Continue';send()};$('endBtn').onclick=report;$('muteBtn').onclick=()=>{state.mute=!state.mute;applyLanguage();if(state.mute)document.querySelectorAll('audio').forEach(a=>a.pause())};$('csvBtn').onclick=csv;$('allBtn').onclick=downloadAll;$('evalBtn').onclick=evaluate;$('newBtn').onclick=()=>location.reload();applyLanguage();
+    const $ = id => document.getElementById(id);
+    const state = { lang: 'en', sessionId: null, framework: null, mode: 'interviewer', rows: [], mute: false, recorder: null, chunks: [], timer: null, busySTT: false };
+    const tr = (key, fallback = '') => window.t ? window.t(key, state.lang, fallback) : fallback || key;
+    const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+    function setPhase(id) {
+      ['setup','framework','role','chat','thanks','report'].forEach(x => $(x).classList.toggle('hidden', x !== id));
+      document.querySelectorAll('.step').forEach((el, i) => {
+        const steps = ['setup','framework','role','chat','report'];
+        el.classList.toggle('active', el.dataset.step === id);
+        el.classList.toggle('done', steps.indexOf(id) > i);
+      });
+    }
+
+    function design() {
+      return {
+        goal: $('goal').value.trim(),
+        methodology: $('methodology').value,
+        targetAudience: $('targetAudience').value.trim(),
+        scenarios: $('scenarios').value.trim(),
+        persona: $('persona').value.trim(),
+      };
+    }
+
+    async function request(url, body = {}) {
+      const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...body, lang: state.lang }) });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      return data;
+    }
+
+    function error(id, msg) { $(id).textContent = msg; $(id).classList.remove('hidden'); }
+    function clearError(id) { $(id).textContent = ''; $(id).classList.add('hidden'); }
+
+    function overlay(title, text) {
+      $('overlayTitle').textContent = title;
+      $('overlayText').textContent = text;
+      $('overlay').classList.add('active');
+      let p = 8;
+      $('overlayBar').style.width = p + '%';
+      return setInterval(() => { $('overlayBar').style.width = (p = Math.min(90, p + 11)) + '%'; }, 700);
+    }
+    function closeOverlay(timer) {
+      clearInterval(timer);
+      $('overlayBar').style.width = '100%';
+      setTimeout(() => { $('overlay').classList.remove('active'); $('overlayBar').style.width = '0%'; }, 250);
+    }
+
+    function stageName(stage) { return tr(`stageLabels.${stage}`, stage); }
+
+    function applyLanguage() {
+      document.documentElement.lang = state.lang;
+      document.querySelectorAll('[data-copy]').forEach(el => { el.textContent = tr(el.dataset.copy); });
+      document.querySelectorAll('.step i').forEach((el, i) => el.textContent = tr(`phases.${i}`));
+      $('goal').placeholder = tr('setup.goalPlaceholder');
+      $('targetAudience').placeholder = tr('setup.targetAudiencePlaceholder');
+      $('scenarios').placeholder = tr('setup.scenariosPlaceholder');
+      $('persona').placeholder = tr('setup.personaPlaceholder');
+      $('answer').placeholder = tr('chat.inputPlaceholder');
+      $('endedNotice').textContent = tr('chat.endedNotice');
+      $('muteBtn').textContent = state.mute ? tr('chat.unmute') : tr('chat.mute');
+      ['General','Jobs-to-be-Done','5 Whys','STAR','Persona'].forEach((label, i) => {
+        $('methodology').options[i].text = state.lang === 'zh' ? ['通用','Jobs-to-be-Done','五问法','STAR','画像'][i] : label;
+      });
+      if (state.framework) renderFramework();
+      document.querySelectorAll('[data-lang]').forEach(b => b.classList.toggle('active', b.dataset.lang === state.lang));
+    }
+
+    function frameworkHTML(fw) {
+      const topics = fw.topics || [];
+      $('frameworkStats').innerHTML = `
+        <div class="metric"><b>${topics.length}</b><span>${tr('framework.topic')}</span></div>
+        <div class="metric"><b>${fw.estimatedTurns || '-'}</b><span>${tr('framework.estimatedTurns')}</span></div>
+        <div class="metric"><b>${(fw.endingCriteria || []).length}</b><span>${tr('framework.endingCriteria')}</span></div>`;
+      $('frameworkHost').innerHTML = topics.map((topic, i) => `
+        <div class="service framework-block" data-index="${i}">
+          <div class="eyebrow">${tr('framework.topic')} ${i + 1}</div>
+          <label>${tr('framework.name')}</label><input data-field="name" value="${esc(topic.name)}">
+          <label>${tr('framework.goal')}</label><textarea data-field="goal">${esc(topic.goal)}</textarea>
+          <div class="grid three">
+            <div><label>${tr('framework.stage')}</label><select data-field="stage">${['introduce','explore','probe','confirm'].map(s => `<option value="${s}" ${s === topic.stage ? 'selected' : ''}>${stageName(s)}</option>`).join('')}</select></div>
+            <div><label>${tr('framework.minQuestions')}</label><input data-field="min_questions" type="number" min="1" value="${Number(topic.min_questions || 1)}"></div>
+            <div><label>${tr('framework.maxQuestions')}</label><input data-field="max_questions" type="number" min="1" value="${Number(topic.max_questions || 1)}"></div>
+          </div>
+          <label>${tr('framework.focusPrompt')}</label><textarea data-field="focus_prompt">${esc(topic.focus_prompt || '')}</textarea>
+        </div>`).join('') + `
+        <div class="service">
+          <div class="eyebrow">${tr('framework.endingCriteria')}</div>
+          ${(fw.endingCriteria || []).map((x, i) => `<input data-ending="${i}" value="${esc(x)}" style="margin-top:8px">`).join('')}
+        </div>`;
+      document.querySelectorAll('.framework-block').forEach(block => {
+        block.querySelectorAll('[data-field]').forEach(el => {
+          el.oninput = () => {
+            const t = state.framework.topics[Number(block.dataset.index)];
+            t[el.dataset.field] = el.type === 'number' ? Math.max(1, Number(el.value || 1)) : el.value;
+          };
+        });
+      });
+      document.querySelectorAll('[data-ending]').forEach(el => {
+        el.oninput = () => { state.framework.endingCriteria[Number(el.dataset.ending)] = el.value; };
+      });
+    }
+
+    function renderFramework() { frameworkHTML(state.framework); }
+
+    async function generateFramework() {
+      clearError('setupError');
+      const d = design();
+      if (!d.goal) return error('setupError', tr('errors.goalRequired'));
+      const timer = overlay(tr('status.generatingFramework'), tr('setup.frameworkHint'));
+      $('generateBtn').disabled = true;
+      try {
+        state.framework = (await request('/api/interview/framework', d)).framework;
+        renderFramework();
+        setPhase('framework');
+      } catch (e) { error('setupError', e.message); }
+      finally { $('generateBtn').disabled = false; closeOverlay(timer); }
+    }
+
+    async function startInterview(mode) {
+      clearError('frameworkError');
+      if (!state.framework?.topics?.length) return error('frameworkError', tr('errors.frameworkRequired'));
+      state.mode = mode;
+      document.body.classList.toggle('respondent', mode === 'respondent');
+      const d = design();
+      const timer = overlay(tr('status.startingInterview'), tr('status.generatingQuestion'));
+      try {
+        const data = await request('/api/interview/start', { ...d, framework: state.framework });
+        state.sessionId = data.id;
+        state.rows = [];
+        $('messages').innerHTML = '';
+        setPhase('chat');
+        appendMessage('assistant', data.message, data);
+        if (data.interviewEnded) finishChat();
+      } catch (e) { error('frameworkError', e.message); }
+      finally { closeOverlay(timer); }
+    }
+
+    function appendMessage(role, text, meta = {}) {
+      const el = document.createElement('div');
+      el.className = `msg ${role}`;
+      el.innerHTML = esc(text);
+      if (role === 'assistant' && (meta.topic_name || meta.stage || meta.action || meta.reason)) {
+        const m = document.createElement('div');
+        m.className = 'meta';
+        m.textContent = [meta.topic_name, meta.stage ? stageName(meta.stage) : '', meta.action].filter(Boolean).join(' · ') + (meta.reason ? `\n${meta.reason}` : '');
+        el.appendChild(m);
+      }
+      $('messages').appendChild(el);
+      $('messages').scrollTop = $('messages').scrollHeight;
+      state.rows.push({ role, text, meta });
+      if (role === 'assistant') attachTTS(el, text);
+    }
+
+    async function attachTTS(host, text) {
+      if (state.mute) return;
+      const row = document.createElement('div');
+      row.className = 'message-audio';
+      row.textContent = tr('chat.playing');
+      host.appendChild(row);
+      try {
+        const res = await fetch('/api/speak', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text }) });
+        if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'TTS failed');
+        const url = URL.createObjectURL(await res.blob());
+        const audio = document.createElement('audio');
+        audio.controls = true;
+        audio.src = url;
+        audio.onended = () => URL.revokeObjectURL(url);
+        row.replaceChildren(audio);
+      } catch {
+        const retry = document.createElement('button');
+        retry.className = 'btn secondary';
+        retry.textContent = tr('chat.retry');
+        retry.onclick = () => { row.remove(); attachTTS(host, text); };
+        row.replaceChildren(retry);
+      }
+    }
+
+    function finishChat() {
+      if (state.mode === 'respondent') { setPhase('thanks'); return; }
+      $('endedNotice').classList.remove('hidden');
+      $('nextBtn').classList.add('hidden');
+    }
+
+    async function send() {
+      const text = $('answer').value.trim();
+      if (!text || !state.sessionId) return;
+      clearError('chatError');
+      $('answer').value = '';
+      appendMessage('user', text);
+      $('sendBtn').disabled = true;
+      try {
+        const data = await request(`/api/interview/${state.sessionId}/message`, { text });
+        appendMessage('assistant', data.message, data);
+        if (data.interviewEnded) finishChat();
+      } catch (e) { error('chatError', e.message); }
+      finally { $('sendBtn').disabled = false; $('answer').focus(); }
+    }
+
+    async function transcribe(final = false) {
+      if (!state.chunks.length || state.busySTT) return;
+      state.busySTT = true;
+      try {
+        const blob = new Blob(state.chunks, { type: state.recorder?.mimeType || 'audio/webm' });
+        const form = new FormData();
+        form.append('audio', blob, 'answer.webm');
+        const res = await fetch('/api/transcribe', { method: 'POST', body: form });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || 'STT failed');
+        $('partial').textContent = `${tr('chat.partialTranscript')}: ${data.text || ''}`;
+        if (final && data.text) { $('answer').value = data.text; $('partial').textContent = tr('chat.editTranscript'); }
+      } catch (e) { $('partial').textContent = tr('chat.sttError'); }
+      finally { state.busySTT = false; }
+    }
+
+    async function toggleRecord() {
+      if (state.recorder?.state === 'recording') { state.recorder.stop(); return; }
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        state.chunks = [];
+        const type = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus' : 'audio/webm';
+        state.recorder = new MediaRecorder(stream, { mimeType: type });
+        state.recorder.ondataavailable = e => { if (e.data.size) state.chunks.push(e.data); };
+        state.recorder.onstop = async () => {
+          clearInterval(state.timer);
+          $('recordBtn').classList.remove('recording');
+          $('recordBtn').textContent = '●';
+          stream.getTracks().forEach(t => t.stop());
+          await transcribe(true);
+        };
+        state.recorder.start(350);
+        state.timer = setInterval(() => transcribe(false), 1500);
+        $('recordBtn').classList.add('recording');
+        $('recordBtn').textContent = '■';
+        $('partial').textContent = tr('chat.listening');
+      } catch { error('chatError', tr('chat.micDenied')); }
+    }
+
+    function renderReport(data) {
+      const r = data.report || {};
+      $('reportHost').innerHTML = `
+        <div class="grid three">
+          <div class="metric"><b>${(r.themes || []).length}</b><span>${tr('report.themes')}</span></div>
+          <div class="metric"><b>${(r.insights || []).length}</b><span>${tr('report.insights')}</span></div>
+          <div class="metric"><b>${(r.recommendations || []).length}</b><span>${tr('report.recommendations')}</span></div>
+        </div>
+        <div class="service"><div class="eyebrow">${tr('report.summary')}</div><p>${esc(r.summary || '')}</p></div>
+        ${r.sentiment ? `<div class="service"><div class="eyebrow">${tr('report.sentiment')}</div><p>${esc(r.sentiment)}</p></div>` : ''}
+        ${(r.themes || []).length ? `<h3>${tr('report.themes')}</h3><div class="grid three">${r.themes.map(x => `<div class="service"><b>${esc(x.name)}</b><p class="muted">${esc(x.description)}</p>${x.quotes?.[0] ? `<div class="quote">${esc(x.quotes[0])}</div>` : ''}</div>`).join('')}</div>` : ''}
+        ${(r.insights || []).length ? `<h3>${tr('report.insights')}</h3><div class="list">${r.insights.map(x => `<div class="service"><b>${esc(x.finding)}</b><p class="muted">${esc(x.evidence)}</p></div>`).join('')}</div>` : ''}
+        ${(r.recommendations || []).length ? `<h3>${tr('report.recommendations')}</h3><div class="grid two">${r.recommendations.map(x => `<div class="service">${esc(x)}</div>`).join('')}</div>` : ''}`;
+      renderTranscript();
+    }
+
+    function renderTranscript() {
+      $('transcriptHost').innerHTML = `<table><thead><tr><th>Role</th><th>Text</th><th>Topic</th><th>Stage</th></tr></thead><tbody>${state.rows.map(r => `<tr><td>${r.role === 'assistant' ? (state.lang === 'zh' ? '主持人' : 'Moderator') : (state.lang === 'zh' ? '受访者' : 'Respondent')}</td><td>${esc(r.text)}</td><td>${esc(r.meta?.topic_name || '')}</td><td>${esc(r.meta?.stage || '')}</td></tr>`).join('')}</tbody></table>`;
+    }
+
+    async function report() {
+      const timer = overlay(tr('status.generatingReport'), tr('report.title'));
+      try {
+        renderReport(await request(`/api/interview/${state.sessionId}/report`));
+        setPhase('report');
+      } catch (e) { error('chatError', e.message); }
+      finally { closeOverlay(timer); }
+    }
+
+    async function evaluate() {
+      try {
+        const e = (await request(`/api/interview/${state.sessionId}/evaluate`)).evaluation;
+        const dims = { naturalness: 'Naturalness', relevance: 'Relevance', probing: 'Probing', single_question: 'Single question', no_bias: 'No bias', progression: 'Progression', ending: 'Ending', persona_fit: 'Persona fit' };
+        $('evalHost').innerHTML = `<div class="service"><div class="eyebrow">${tr('report.evaluate')}</div><p>${esc(e.overall_comment || '')}</p><div class="bar-list">${Object.entries(dims).map(([k, v]) => { const n = Number(e.scores?.[k] || 0); return `<div class="barrow"><span>${v}</span><div class="track"><span style="width:${n / 5 * 100}%"></span></div><b>${n}/5</b></div>`; }).join('')}</div></div>`;
+      } catch (e) { $('evalHost').innerHTML = `<div class="error">${esc(e.message)}</div>`; }
+    }
+
+    function csv() {
+      const pairs = [];
+      for (let i = 0; i < state.rows.length; i++) {
+        if (state.rows[i].role === 'assistant') {
+          const a = state.rows[i + 1]?.role === 'user' ? state.rows[i + 1].text : '';
+          pairs.push([pairs.length + 1, state.rows[i].text, a]);
+          if (a) i++;
+        }
+      }
+      const text = [['No.', 'Question', 'Answer'], ...pairs].map(r => r.map(v => `"${String(v).replaceAll('"', '""')}"`).join(',')).join('\n');
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob(['\ufeff' + text], { type: 'text/csv;charset=utf-8' }));
+      a.download = 'interview-qa.csv';
+      a.click();
+      URL.revokeObjectURL(a.href);
+    }
+
+    function csvTranscript() {
+      const rows = state.rows.map((r, i) => [i + 1, r.role === 'assistant' ? (state.lang === 'zh' ? '主持人' : 'Moderator') : (state.lang === 'zh' ? '受访者' : 'Respondent'), r.text, r.meta?.topic_name || '', r.meta?.stage || '']);
+      const text = [['No.', 'Role', 'Text', 'Topic', 'Stage'], ...rows].map(r => r.map(v => `"${String(v).replaceAll('"', '""')}"`).join(',')).join('\n');
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob(['\ufeff' + text], { type: 'text/csv;charset=utf-8' }));
+      a.download = 'interview-transcript.csv';
+      a.click();
+      URL.revokeObjectURL(a.href);
+    }
+
+    async function downloadAll() {
+      if (!state.sessionId) return;
+      const data = await fetch(`/api/interview/${state.sessionId}/export`).then(r => r.json());
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }));
+      a.download = `interview-${state.sessionId}.json`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    }
+
+    document.querySelectorAll('[data-lang]').forEach(b => b.onclick = () => { state.lang = b.dataset.lang; applyLanguage(); });
+    $('generateBtn').onclick = generateFramework;
+    $('backBtn').onclick = () => setPhase('setup');
+    $('startBtn').onclick = () => setPhase('role');
+    $('respondentBtn').onclick = () => startInterview('respondent');
+    $('interviewerBtn').onclick = () => startInterview('interviewer');
+    $('sendBtn').onclick = send;
+    $('answer').onkeydown = e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } };
+    $('recordBtn').onclick = toggleRecord;
+    $('nextBtn').onclick = () => { $('answer').value = state.lang === 'zh' ? '继续' : 'Continue'; send(); };
+    $('endBtn').onclick = report;
+    $('muteBtn').onclick = () => { state.mute = !state.mute; applyLanguage(); if (state.mute) document.querySelectorAll('audio').forEach(a => a.pause()); };
+    $('csvBtn').onclick = csv;
+    $('csvTranscriptBtn').onclick = csvTranscript;
+    $('allBtn').onclick = downloadAll;
+    $('evalBtn').onclick = evaluate;
+    $('newBtn').onclick = () => location.reload();
+    applyLanguage();
   </script>
 </body>
 </html>
