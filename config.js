@@ -54,7 +54,7 @@ export const CONFIG = {
         apiKey: 'sk-rCRVSuiZ64bC15AuJU9VZshP88V1rNSU6cArwmNwma5SFEPV',
       },
     ]),
-    speed: env('TTS_SPEED', '1'),
+    speed: env('TTS_SPEED', '1.15'),
     preferences: envJson('TTS_PREFERENCES', [
       // qwen3-tts-flash does not accept a voice parameter.
       { model: 'qwen3-tts-flash' },
