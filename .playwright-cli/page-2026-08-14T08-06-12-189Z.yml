@@ -1,0 +1,119 @@
+- generic [ref=e2]:
+  - banner [ref=e3]:
+    - generic [ref=e4]:
+      - img "Oliver Wyman" [ref=e5]
+      - generic [ref=e6]: Insights
+    - generic [ref=e7]:
+      - button "English" [ref=e8] [cursor=pointer]
+      - button "中文" [ref=e9] [cursor=pointer]
+  - navigation [ref=e10]:
+    - generic [ref=e11]: 1 Setup
+    - generic [ref=e12]: 2 Framework
+    - generic [ref=e13]: 3 Role
+    - generic [ref=e14]: 4 Interview
+    - generic [ref=e15]: 5 Report
+  - generic:
+    - generic:
+      - generic: Insights
+      - heading [level=2]
+      - paragraph
+  - generic [ref=e16]:
+    - generic [ref=e17]: Voice research
+    - heading "Setup" [level=1] [ref=e18]
+    - paragraph [ref=e19]: AI-moderated in-depth interviews. Design the research framework, then naturally probe, wrap up, and generate insight reports.
+    - generic [ref=e20]:
+      - article [ref=e167]:
+        - generic [ref=e168]:
+          - heading "Chat provider" [level=3] [ref=e169]
+          - button "Fetch models" [ref=e170] [cursor=pointer]
+        - generic [ref=e171]:
+          - generic [ref=e172]:
+            - generic [ref=e173]: Protocol
+            - combobox [ref=e174]:
+              - option "OpenAI-compatible" [selected]
+              - option "Anthropic-compatible"
+              - option "Hugging Face task"
+          - generic [ref=e175]:
+            - generic [ref=e176]: Model
+            - combobox "gpt-4o-mini" [ref=e177]
+        - generic [ref=e178]: Base URL
+        - textbox "https://.../v1" [ref=e179]: http://127.0.0.1:3011/v1
+        - generic [ref=e180]: API Key
+        - textbox "sk-..." [ref=e181]: fake-key
+        - group [ref=e182]:
+          - generic "Advanced" [ref=e183] [cursor=pointer]
+        - paragraph [ref=e184]: Used only in requests; never stored on the server.
+      - article [ref=e185]:
+        - generic [ref=e186]:
+          - heading "Speech-to-text" [level=3] [ref=e187]
+          - button "Use same as Chat" [ref=e188] [cursor=pointer]
+        - generic [ref=e189]:
+          - generic [ref=e190]:
+            - generic [ref=e191]: Protocol
+            - combobox [ref=e192]:
+              - option "OpenAI-compatible" [selected]
+              - option "Hugging Face task"
+          - generic [ref=e193]:
+            - generic [ref=e194]: Model
+            - combobox "whisper-1" [ref=e195]
+        - generic [ref=e196]: Base URL
+        - textbox "https://.../v1" [ref=e197]: http://127.0.0.1:3011/v1
+        - generic [ref=e198]: API Key
+        - textbox "Optional if your endpoint is public" [ref=e199]: fake-key
+        - group [ref=e200]:
+          - generic "Advanced" [ref=e201] [cursor=pointer]
+          - generic [ref=e202]: Language
+          - textbox "en" [ref=e203]
+        - paragraph [ref=e204]: "OpenAI: /audio/transcriptions. Hugging Face: ASR task endpoint."
+      - article [ref=e205]:
+        - generic [ref=e206]:
+          - heading "Text-to-speech" [level=3] [ref=e207]
+          - button "Use same as Chat" [ref=e208] [cursor=pointer]
+        - generic [ref=e209]:
+          - generic [ref=e210]:
+            - generic [ref=e211]: Protocol
+            - combobox [ref=e212]:
+              - option "OpenAI-compatible" [selected]
+              - option "Hugging Face task"
+          - generic [ref=e213]:
+            - generic [ref=e214]: Model
+            - combobox "tts-1" [ref=e215]
+        - generic [ref=e216]: Base URL
+        - textbox "https://.../v1" [ref=e217]: http://127.0.0.1:3011/v1
+        - generic [ref=e218]: API Key
+        - textbox "Optional if your endpoint is public" [ref=e219]: fake-key
+        - group [ref=e220]:
+          - generic "Advanced" [ref=e221] [cursor=pointer]
+          - generic [ref=e222]:
+            - generic [ref=e223]:
+              - generic [ref=e224]: Voice
+              - textbox "alloy" [ref=e225]
+            - generic [ref=e226]:
+              - generic [ref=e227]: Speed
+              - spinbutton [ref=e228]: "1"
+        - paragraph [ref=e229]: "OpenAI: /audio/speech. Hugging Face: TTS task endpoint."
+    - separator [ref=e84]
+    - generic [ref=e85]: Setup
+    - generic [ref=e86]: Research goal
+    - textbox "e.g., understand why users drop off during onboarding" [ref=e87]: Understand whiskey market behavior among daily drinkers, including purchase habits, brand choice, price sensitivity, and unmet needs.
+    - generic [ref=e88]:
+      - generic [ref=e89]:
+        - generic [ref=e90]: Methodology
+        - combobox [ref=e91]:
+          - option "General" [selected]
+          - option "Jobs-to-be-Done"
+          - option "5 Whys"
+          - option "STAR"
+          - option "Persona"
+      - generic [ref=e92]:
+        - generic [ref=e93]: Target audience
+        - textbox "e.g., SaaS product managers aged 25-35 in tier-1 cities" [ref=e94]: Consultant interviewing a client who drinks whiskey every day.
+    - generic [ref=e95]:
+      - generic [ref=e96]:
+        - generic [ref=e97]: Research scenarios
+        - textbox "e.g., first signup, purchase decision, last login before churn" [ref=e98]: Daily consumption occasions, recent purchase decisions, switching triggers, and preferred retail channels.
+      - generic [ref=e99]:
+        - generic [ref=e100]: Respondent persona / context
+        - textbox "e.g., time-constrained, ROI-focused, sensitive to data" [ref=e101]: A habitual whiskey consumer with routine evening use and regular repurchase behavior.
+    - button "Generate framework" [active] [ref=e103] [cursor=pointer]
+    - generic [ref=e230]: Please select or enter a model.

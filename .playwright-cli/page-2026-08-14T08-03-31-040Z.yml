@@ -1,0 +1,118 @@
+- generic [ref=e2]:
+  - banner [ref=e3]:
+    - generic [ref=e4]:
+      - img "Oliver Wyman" [ref=e5]
+      - generic [ref=e6]: Insights
+    - generic [ref=e7]:
+      - button "English" [ref=e8] [cursor=pointer]
+      - button "中文" [ref=e9] [cursor=pointer]
+  - navigation [ref=e10]:
+    - generic [ref=e11]: 1 Setup
+    - generic [ref=e12]: 2 Framework
+    - generic [ref=e13]: 3 Role
+    - generic [ref=e14]: 4 Interview
+    - generic [ref=e15]: 5 Report
+  - generic:
+    - generic:
+      - generic: Insights
+      - heading [level=2]
+      - paragraph
+  - generic [ref=e16]:
+    - generic [ref=e17]: Voice research
+    - heading "Setup" [level=1] [ref=e18]
+    - paragraph [ref=e19]: AI-moderated in-depth interviews. Design the research framework, then naturally probe, wrap up, and generate insight reports.
+    - generic [ref=e20]:
+      - article [ref=e21]:
+        - generic [ref=e22]:
+          - heading "Chat provider" [level=3] [ref=e23]
+          - button "Fetch models" [ref=e24] [cursor=pointer]
+        - generic [ref=e25]:
+          - generic [ref=e26]:
+            - generic [ref=e27]: Protocol
+            - combobox [ref=e28]:
+              - option "OpenAI-compatible" [selected]
+              - option "Anthropic-compatible"
+              - option "Hugging Face task"
+          - generic [ref=e29]:
+            - generic [ref=e30]: Model
+            - combobox "gpt-4o-mini" [ref=e31]
+        - generic [ref=e32]: Base URL
+        - textbox "https://.../v1" [ref=e33]
+        - generic [ref=e34]: API Key
+        - textbox "sk-..." [ref=e35]
+        - group [ref=e36]:
+          - generic "Advanced" [ref=e37] [cursor=pointer]
+        - paragraph [ref=e38]: Used only in requests; never stored on the server.
+      - article [ref=e39]:
+        - generic [ref=e40]:
+          - heading "Speech-to-text" [level=3] [ref=e41]
+          - button "Use same as Chat" [ref=e42] [cursor=pointer]
+        - generic [ref=e43]:
+          - generic [ref=e44]:
+            - generic [ref=e45]: Protocol
+            - combobox [ref=e46]:
+              - option "OpenAI-compatible" [selected]
+              - option "Hugging Face task"
+          - generic [ref=e47]:
+            - generic [ref=e48]: Model
+            - combobox "whisper-1" [ref=e49]
+        - generic [ref=e50]: Base URL
+        - textbox "https://.../v1" [ref=e51]
+        - generic [ref=e52]: API Key
+        - textbox "Optional if your endpoint is public" [ref=e53]
+        - group [ref=e54]:
+          - generic "Advanced" [ref=e55] [cursor=pointer]
+          - generic [ref=e56]: Language
+          - textbox "en" [ref=e57]
+        - paragraph [ref=e58]: "OpenAI: /audio/transcriptions. Hugging Face: ASR task endpoint."
+      - article [ref=e59]:
+        - generic [ref=e60]:
+          - heading "Text-to-speech" [level=3] [ref=e61]
+          - button "Use same as Chat" [ref=e62] [cursor=pointer]
+        - generic [ref=e63]:
+          - generic [ref=e64]:
+            - generic [ref=e65]: Protocol
+            - combobox [ref=e66]:
+              - option "OpenAI-compatible" [selected]
+              - option "Hugging Face task"
+          - generic [ref=e67]:
+            - generic [ref=e68]: Model
+            - combobox "tts-1" [ref=e69]
+        - generic [ref=e70]: Base URL
+        - textbox "https://.../v1" [ref=e71]
+        - generic [ref=e72]: API Key
+        - textbox "Optional if your endpoint is public" [ref=e73]
+        - group [ref=e74]:
+          - generic "Advanced" [ref=e75] [cursor=pointer]
+          - generic [ref=e76]:
+            - generic [ref=e77]:
+              - generic [ref=e78]: Voice
+              - textbox "alloy" [ref=e79]
+            - generic [ref=e80]:
+              - generic [ref=e81]: Speed
+              - spinbutton [ref=e82]: "1"
+        - paragraph [ref=e83]: "OpenAI: /audio/speech. Hugging Face: TTS task endpoint."
+    - separator [ref=e84]
+    - generic [ref=e85]: Setup
+    - generic [ref=e86]: Research goal
+    - textbox "e.g., understand why users drop off during onboarding" [ref=e87]
+    - generic [ref=e88]:
+      - generic [ref=e89]:
+        - generic [ref=e90]: Methodology
+        - combobox [ref=e91]:
+          - option "General" [selected]
+          - option "Jobs-to-be-Done"
+          - option "5 Whys"
+          - option "STAR"
+          - option "Persona"
+      - generic [ref=e92]:
+        - generic [ref=e93]: Target audience
+        - textbox "e.g., SaaS product managers aged 25-35 in tier-1 cities" [ref=e94]
+    - generic [ref=e95]:
+      - generic [ref=e96]:
+        - generic [ref=e97]: Research scenarios
+        - textbox "e.g., first signup, purchase decision, last login before churn" [ref=e98]
+      - generic [ref=e99]:
+        - generic [ref=e100]: Respondent persona / context
+        - textbox "e.g., time-constrained, ROI-focused, sensitive to data" [ref=e101]
+    - button "Generate framework" [ref=e103] [cursor=pointer]

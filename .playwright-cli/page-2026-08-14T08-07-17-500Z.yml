@@ -1,0 +1,129 @@
+- generic [ref=e2]:
+  - banner [ref=e3]:
+    - generic [ref=e4]:
+      - img "Oliver Wyman" [ref=e5]
+      - generic [ref=e6]: Insights
+    - generic [ref=e7]:
+      - button "English" [ref=e8] [cursor=pointer]
+      - button "中文" [ref=e9] [cursor=pointer]
+  - navigation [ref=e10]:
+    - generic [ref=e11]: 1 Setup
+    - generic [ref=e12]: 2 Framework
+    - generic [ref=e13]: 3 Role
+    - generic [ref=e14]: 4 Interview
+    - generic [ref=e15]: 5 Report
+  - generic:
+    - generic:
+      - generic: Insights
+      - heading "Generating interview framework…" [level=2]
+      - paragraph: The AI will split your goal into topics you can edit before the interview.
+  - generic [ref=e231]:
+    - generic [ref=e232]: Research design
+    - heading "Research framework" [level=2] [ref=e233]
+    - paragraph [ref=e234]: AI-generated interview topics. You can edit each block.
+    - generic [ref=e235]:
+      - generic [ref=e236]:
+        - generic [ref=e237]: "4"
+        - text: Topic
+      - generic [ref=e238]:
+        - generic [ref=e239]: "10"
+        - text: Estimated turns
+      - generic [ref=e240]:
+        - generic [ref=e241]: "2"
+        - text: Ending criteria
+    - generic [ref=e242]:
+      - generic [ref=e243]:
+        - generic [ref=e244]: Topic 1
+        - generic [ref=e245]: Name
+        - textbox [ref=e246]: Daily routine
+        - generic [ref=e247]: Goal
+        - textbox [ref=e248]: Understand daily whiskey consumption habits
+        - generic [ref=e249]:
+          - generic [ref=e250]:
+            - generic [ref=e251]: Stage
+            - combobox [ref=e252]:
+              - option "Introduce" [selected]
+              - option "Explore"
+              - option "Probe"
+              - option "Confirm"
+          - generic [ref=e253]:
+            - generic [ref=e254]: Min questions
+            - spinbutton [ref=e255]: "2"
+          - generic [ref=e256]:
+            - generic [ref=e257]: Max questions
+            - spinbutton [ref=e258]: "3"
+        - generic [ref=e259]: Focus prompt
+        - textbox [ref=e260]: Ask about when, where, and how whiskey is consumed
+      - generic [ref=e261]:
+        - generic [ref=e262]: Topic 2
+        - generic [ref=e263]: Name
+        - textbox [ref=e264]: Purchasing behavior
+        - generic [ref=e265]: Goal
+        - textbox [ref=e266]: Understand brand choice, channel, and spend
+        - generic [ref=e267]:
+          - generic [ref=e268]:
+            - generic [ref=e269]: Stage
+            - combobox [ref=e270]:
+              - option "Introduce"
+              - option "Explore" [selected]
+              - option "Probe"
+              - option "Confirm"
+          - generic [ref=e271]:
+            - generic [ref=e272]: Min questions
+            - spinbutton [ref=e273]: "2"
+          - generic [ref=e274]:
+            - generic [ref=e275]: Max questions
+            - spinbutton [ref=e276]: "4"
+        - generic [ref=e277]: Focus prompt
+        - textbox [ref=e278]: Ask about recent purchases and selection criteria
+      - generic [ref=e279]:
+        - generic [ref=e280]: Topic 3
+        - generic [ref=e281]: Name
+        - textbox [ref=e282]: Switching and unmet needs
+        - generic [ref=e283]: Goal
+        - textbox [ref=e284]: Understand switching triggers and unmet needs
+        - generic [ref=e285]:
+          - generic [ref=e286]:
+            - generic [ref=e287]: Stage
+            - combobox [ref=e288]:
+              - option "Introduce"
+              - option "Explore"
+              - option "Probe" [selected]
+              - option "Confirm"
+          - generic [ref=e289]:
+            - generic [ref=e290]: Min questions
+            - spinbutton [ref=e291]: "1"
+          - generic [ref=e292]:
+            - generic [ref=e293]: Max questions
+            - spinbutton [ref=e294]: "3"
+        - generic [ref=e295]: Focus prompt
+        - textbox [ref=e296]: Ask what could change current behavior
+      - generic [ref=e297]:
+        - generic [ref=e298]: Topic 4
+        - generic [ref=e299]: Name
+        - textbox [ref=e300]: Wrap-up
+        - generic [ref=e301]: Goal
+        - textbox [ref=e302]: Confirm key points and priorities
+        - generic [ref=e303]:
+          - generic [ref=e304]:
+            - generic [ref=e305]: Stage
+            - combobox [ref=e306]:
+              - option "Introduce"
+              - option "Explore"
+              - option "Probe"
+              - option "Confirm" [selected]
+          - generic [ref=e307]:
+            - generic [ref=e308]: Min questions
+            - spinbutton [ref=e309]: "1"
+          - generic [ref=e310]:
+            - generic [ref=e311]: Max questions
+            - spinbutton [ref=e312]: "2"
+        - generic [ref=e313]: Focus prompt
+        - textbox [ref=e314]: Confirm the most important takeaway
+      - generic [ref=e315]:
+        - generic [ref=e316]: Ending criteria
+        - textbox [ref=e317]: Enough detail captured
+        - textbox [ref=e318]: Respondent has nothing more to add
+    - generic [ref=e319]:
+      - button "Back to setup" [ref=e320] [cursor=pointer]
+      - button "Start interview" [ref=e321] [cursor=pointer]
