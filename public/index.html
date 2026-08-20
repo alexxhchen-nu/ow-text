@@ -125,6 +125,7 @@
           <button id="mdBtn" class="btn secondary" data-copy="report.downloadMarkdown"></button>
           <button id="csvTranscriptBtn" class="btn secondary" data-copy="report.downloadTranscriptCsv"></button>
           <button id="evalBtn" class="btn secondary" data-copy="report.evaluate"></button>
+          <button id="evalDownloadBtn" class="btn secondary hidden" data-copy="report.downloadEvaluation"></button>
           <button id="newBtn" class="btn secondary" data-copy="report.newInterview"></button>
         </div>
       </div>
@@ -139,7 +140,7 @@
 
   <script>
     const $ = id => document.getElementById(id);
-    const state = { lang: 'en', sessionId: null, framework: null, mode: 'interviewer', rows: [], mute: false, recorder: null, chunks: [], timer: null, busySTT: false };
+    const state = { lang: 'en', sessionId: null, framework: null, mode: 'interviewer', rows: [], mute: false, recorder: null, chunks: [], timer: null, busySTT: false, evaluation: null };
     const tr = (key, fallback = '') => window.t ? window.t(key, state.lang, fallback) : fallback || key;
     const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
@@ -406,11 +407,39 @@
     }
 
     async function evaluate() {
+      const timer = overlay(tr('status.evaluating'), tr('report.evaluate'));
       try {
         const e = (await request(`/api/interview/${state.sessionId}/evaluate`)).evaluation;
+        state.evaluation = e;
         const dims = { naturalness: 'Naturalness', relevance: 'Relevance', probing: 'Probing', single_question: 'Single question', no_bias: 'No bias', progression: 'Progression', ending: 'Ending', persona_fit: 'Persona fit' };
         $('evalHost').innerHTML = `<div class="service"><div class="eyebrow">${tr('report.evaluate')}</div><p>${esc(e.overall_comment || '')}</p><div class="bar-list">${Object.entries(dims).map(([k, v]) => { const n = Number(e.scores?.[k] || 0); return `<div class="barrow"><span>${v}</span><div class="track"><span style="width:${n / 5 * 100}%"></span></div><b>${n}/5</b></div>`; }).join('')}</div></div>`;
+        $('evalDownloadBtn').classList.remove('hidden');
       } catch (e) { $('evalHost').innerHTML = `<div class="error">${esc(e.message)}</div>`; }
+      finally { closeOverlay(timer); }
+    }
+
+    function downloadEvaluation() {
+      if (!state.evaluation) return;
+      const e = state.evaluation;
+      const dims = { naturalness: 'Naturalness', relevance: 'Relevance', probing: 'Probing', single_question: 'Single question', no_bias: 'No bias', progression: 'Progression', ending: 'Ending', persona_fit: 'Persona fit' };
+      let md = `# Interview Evaluation\n\n`;
+      md += `## Overall Comment\n\n${e.overall_comment || 'No comment'}\n\n`;
+      md += `## Scores\n\n`;
+      Object.entries(dims).forEach(([k, v]) => {
+        const n = Number(e.scores?.[k] || 0);
+        md += `- **${v}**: ${n}/5\n`;
+      });
+      if (e.top_strength) md += `\n## Top Strength\n\n${e.top_strength}\n\n`;
+      if (e.top_weakness) md += `## Top Weakness\n\n${e.top_weakness}\n\n`;
+      if (e.bad_cases?.length) {
+        md += `## Bad Cases\n\n`;
+        e.bad_cases.forEach(c => md += `- ${c}\n`);
+      }
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([md], { type: 'text/markdown;charset=utf-8' }));
+      a.download = `evaluation-${state.sessionId}.md`;
+      a.click();
+      URL.revokeObjectURL(a.href);
     }
 
     function csvTranscript() {
@@ -480,6 +509,7 @@
     $('mdBtn').onclick = markdown;
     $('csvTranscriptBtn').onclick = csvTranscript;
     $('evalBtn').onclick = evaluate;
+    $('evalDownloadBtn').onclick = downloadEvaluation;
     $('newBtn').onclick = () => location.reload();
     applyLanguage();
   </script>
